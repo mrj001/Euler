@@ -1,0 +1,38 @@
+;@com.wudsn.ide.asm.hardware=C64
+!to "HelloWorld.prg", cbm
+!cpu 6510
+
+; BASIC program: (Where .run is replaced by its address.)
+;   10 SYS .run
+* = $0801
+    !byte <.basend,>.basend,$0A,$00,$9e
+    !byte .run/10000 + '0'    
+    !byte .run/1000 % 10 + '0'    
+    !byte .run/100 % 10 + '0'   
+    !byte .run/10 % 10 + '0' 
+    !byte .run % 10 + '0' 
+    !byte 0
+.basend !byte 0, 0
+
+teststring !scr "hello, world!", 13, "0123456789012345678901234567890123456789third line", 0
+
+!source "../libs/preamble.a"
+!source "../libs/screen.a"
+
+;
+; This test should print "HELLO, WORLD!" on the first line of the screen
+; The second line of the screen should be filled with the digits 0 through 
+; 9 repeated 4 times.
+; The third line should say "THIRD LINE"
+; The screen is not cleared.
+;
+
+.run
+; record address of teststring as a parameter to print subroutine
+     lda #(<teststring)
+     sta+1 straddr
+     lda #(>teststring)
+     sta+1 straddr + 1
+
+     jmp subprint
+    

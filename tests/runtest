@@ -1,0 +1,7 @@
+#!/bin/bash
+if [[ $1 != "" ]]
+then
+   /Applications/vice-gtk3-3.5/bin/x64sc -autostart $1
+else
+   /Applications/vice-gtk3-3.5/bin/x64sc
+fi

@@ -1,0 +1,10 @@
+;
+; Memory map
+;
+
+; two bytes to use for a temporary address
+tmpaddr = $02
+
+; two bytes to pass a pointer to a string to the print subroutine
+straddr = $04
+

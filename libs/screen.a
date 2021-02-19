@@ -1,0 +1,64 @@
+; Screen routines
+!zone screen {
+    .screencols = 40
+    .screenrows = 25
+    .screenstart = $0400
+
+; Start address of current screen row.
+.currow=*
+!word .screenstart
+
+; Column index of current screen column.
+.curcol=*
+!fi 1, 0
+
+; Current character index within the string
+.curchar=*
+!fi 1, 0
+    
+subprint
+    lda #$00         ; set to zero'th char in string
+    sta .curchar
+
+    lda .currow      ; load low-byte of pointer to current screen row
+    sta tmpaddr      ; store it in zero page
+    lda .currow + 1  ; load high-byte of pointer to current screen row
+    sta tmpaddr + 1  ; store it in zero page.
+
+; Print one character.
+.prchar
+    ldy .curchar     ; load current character index
+    lda (straddr), y ; load current character of string
+    beq .end         ; if it is null, goto cleanup
+    cmp #$0d         ; If it is return, go to next screen line
+    beq ++
+
+    ldy .curcol      ; load current screen column
+    sta (tmpaddr),y  ; print character to screen
+    iny              ; move to next column
+    sty .curcol
+    cpy #.screencols ; if we have not reached the right edge of the screen
+    bne .next        ;    goto next loop iteration.
+    
+; Advance to next screen row.
+++  ldy #$00         ; back to column 0
+    sty .curcol
+    lda #.screencols
+    clc              ; Add screen columns to low byte of .currow
+    adc tmpaddr
+    sta tmpaddr
+    bcc .next        ; If there was no carry, go to the next loop iteration
+    inc tmpaddr + 1  ; increment the high byte of .currow
+          ; TODO handle out of rows....
+
+.next
+    inc .curchar     ; increment character index
+    jmp .prchar
+.end
+    lda tmpaddr      ; copy low byte of current screen row pointer
+    sta .currow
+    lda tmpaddr + 1  ; copy high byte of current screen row pointer
+    sta .currow + 1
+    rts
+
+}  ; end zone screen
