@@ -2,3 +2,6 @@
 *.prg
 *.d64
 
+# ignore vim swap files
+*.swp
+
