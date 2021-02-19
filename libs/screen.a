@@ -61,4 +61,44 @@ subprint
     sta .currow + 1
     rts
 
+subclearscreen
+; use tmpaddr to point into the screen memory
+    lda #<(.screenstart + $0300)
+    sta tmpaddr
+    lda #>(.screenstart + $0300)
+    sta tmpaddr + 1
+
+    lda #$20     ; equals to "space"
+
+    ; write spaces over last page of the screen
+    ldy #$e8     ; last page of screen only uses $E8 characters
+-   sta (tmpaddr), y
+    dey
+    bne -
+    sta (tmpaddr), y ; fill first byte of the page.
+
+    ; write spaces over the first three pages of the screen
+    ldx #$03
+    ldy #$ff
+--- dec tmpaddr + 1  ; decrement high byte of tmpaddr
+--  sta (tmpaddr), y
+    dey
+    bne --
+    sta (tmpaddr), y ; fill first byte of the page.
+    dey              ; set y to $FF
+    dex
+    bne ---
+
+    ; set current row to screenstart
+    lda #<.screenstart
+    sta .currow
+    lda #>.screenstart
+    sta .currow + 1
+
+    ; set current column to zero
+    lda #$00
+    sta .curcol
+
+    rts
+
 }  ; end zone screen

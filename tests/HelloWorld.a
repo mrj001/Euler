@@ -20,19 +20,23 @@ teststring !scr "hello, world!", 13, "0123456789012345678901234567890123456789th
 !source "../libs/screen.a"
 
 ;
+; The screen is cleared.
 ; This test should print "HELLO, WORLD!" on the first line of the screen
 ; The second line of the screen should be filled with the digits 0 through 
 ; 9 repeated 4 times.
 ; The third line should say "THIRD LINE"
-; The screen is not cleared.
+; Note that the "READY" line will be further down the screen as we are
+; not updating BASIC's idea of where the cursor is.
 ;
 
 .run
-; record address of teststring as a parameter to print subroutine
-     lda #(<teststring)
-     sta+1 straddr
-     lda #(>teststring)
-     sta+1 straddr + 1
+    jsr subclearscreen
 
-     jmp subprint
+; record address of teststring as a parameter to print subroutine
+    lda #(<teststring)
+    sta+1 straddr
+    lda #(>teststring)
+    sta+1 straddr + 1
+
+    jmp subprint
     
