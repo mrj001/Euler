@@ -14,8 +14,49 @@
     !byte 0
 .basend !byte 0, 0
 
-.pass !scr "pass", 13, 0
-.fail !scr "fail", 13, 0
+; This macro prints the label for the current test
+!macro print_label .lbl {
+    lda #<.lbl
+    sta+1 straddr
+    lda #>.lbl
+    sta+1 straddr + 1
+    jsr subprint
+}
+
+; This macro sets the parameters for the math_isequal subroutine.
+!macro set_param .prec, .op1, .op2 {
+    lda #.prec         ; set precision to .prec
+    sta+1 mathprec
+    lda #<.op1         ; operand 1
+    sta+1 mathop1
+    lda #>.1
+    sta+1 mathop1 + 1
+    lda #<.op2         ; operand 2
+    sta+1 mathop2
+    lda #>.op2
+    sta+1 mathop2 + 1
+}
+
+pass !scr "pass", 13, 0
+fail !scr "fail", 13, 0
+
+; This macro prints out pass if the Z flag is clear
+; and fail if the Z flag is set.
+!macro assert_not_equal {
+    beq .testfail
+    lda #<pass
+    sta+1 straddr
+    lda #>pass
+    sta+1 straddr + 1
+    jmp .end
+.testfail:
+    lda #<fail
+    sta+1 straddr
+    lda #>fail
+    sta+1 straddr + 1
+.end
+    jsr subprint
+}
 
 ;
 ; Test 1: add two single byte integers
@@ -29,42 +70,12 @@
 .run
     jsr subclearscreen
 
-    ; print out test label
-    lda #<.l1
-    sta+1 straddr
-    lda #>.l1
-    sta+1 straddr + 1
-    jsr subprint
-
-    ; push test 1 parameters
-    lda #$01          ; set precision to 1
-    sta+1 mathprec
-    lda #<.a1          ; operand 1
-    sta+1 mathop1
-    lda #>.a1
-    sta+1 mathop1 + 1
-    lda #<.a2          ; operand 2
-    sta+1 mathop2
-    lda #>.a2
-    sta+1 mathop2 + 1
+    +print_label .l1
+    +set_param 1, .a1, .a2
 
     jsr math_isequal
 
-    ; print out test result.
-    ; this test is hard-coded to require "not equals" as the answer
-    beq .t1fail
-    lda #<.pass
-    sta+1 straddr
-    lda #>.pass
-    sta+1 straddr + 1
-    jmp .end1
-.t1fail:
-    lda #<.fail
-    sta+1 straddr
-    lda #>.fail
-    sta+1 straddr + 1
-.end1
-    jsr subprint
+    +assert_not_equal
     rts           ; TODO add additional tests
 
 !source "../libs/preamble.a"
