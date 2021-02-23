@@ -1,6 +1,7 @@
 ;@com.wudsn.ide.asm.hardware=C64
 !to "TestIsEqual.prg", cbm 
 !cpu 6510
+!sl "TestIsEqual.labels"
 
 ; BASIC program: (Where .run is replaced by its address.)
 ;   10 SYS .run
@@ -29,7 +30,7 @@
     sta+1 mathprec
     lda #<.op1         ; operand 1
     sta+1 mathop1
-    lda #>.1
+    lda #>.op1
     sta+1 mathop1 + 1
     lda #<.op2         ; operand 2
     sta+1 mathop2
