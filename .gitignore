@@ -1,6 +1,7 @@
 # Ignore output files
 *.prg
 *.d64
+*.labels
 
 # ignore vim swap files
 *.swp
