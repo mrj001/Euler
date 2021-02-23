@@ -76,6 +76,47 @@ fail !scr "fail", 13, 0
     jsr math_isequal
 
     +assert_not_equal
+
+    jmp .test2
+
+;
+; Test 2: compare two 2-byte integers that differ in the low
+; order byte.
+;
+.b1=*
+!byte $05
+!byte $DE
+.b2=*
+!byte $06
+!byte $DE
+.l2 !scr "two: ", 0
+.test2
+    +print_label .l2
+    +set_param 2, .b1, .b2
+
+    jsr math_isequal
+
+    +assert_not_equal
+
+    jmp .test3
+
+;
+; Test 3: compare two 4-byte integers that are equal
+;
+.c1=*
+!byte $44, $21, $44, 0x83
+.c2=*
+!byte $44, $21, $44, 0x83
+.l3 !scr "three: ", 0
+
+.test3
+    +print_label .l3
+    +set_param 4, .c1, .c2
+
+    jsr math_isequal
+
+    +assert_not_equal
+
     rts           ; TODO add additional tests
 
 !source "../libs/preamble.a"
