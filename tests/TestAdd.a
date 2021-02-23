@@ -1,0 +1,165 @@
+;@com.wudsn.ide.asm.hardware=C64
+!to "TestAdd.prg", cbm 
+!cpu 6510
+!sl "TestAdd.labels"
+
+; BASIC program: (Where .run is replaced by its address.)
+;   10 SYS .run
+* = $0801
+    !byte <.basend,>.basend,$0A,$00,$9e
+    !byte .run/10000 + '0'    
+    !byte .run/1000 % 10 + '0'    
+    !byte .run/100 % 10 + '0'   
+    !byte .run/10 % 10 + '0' 
+    !byte .run % 10 + '0' 
+    !byte 0
+.basend !byte 0, 0
+
+!source "../libs/arithmetic.a"
+
+; This macro prints the label for the current test
+!macro print_label .lbl {
+    lda #<.lbl
+    sta+1 straddr
+    lda #>.lbl
+    sta+1 straddr + 1 
+    jsr subprint
+}
+
+; This macro sets the parameters for the math_isequal subroutine.
+!macro set_param_isequal .prec, .op1, .op2 {
+    lda #.prec         ; set precision to .prec
+    sta+1 mathprec
+    lda #<.op1         ; operand 1
+    sta+1 mathop1
+    lda #>.op1
+    sta+1 mathop1 + 1 
+    lda #<.op2         ; operand 2
+    sta+1 mathop2
+    lda #>.op2
+    sta+1 mathop2 + 1 
+}
+
+pass !scr "pass", 13, 0
+fail !scr "fail", 13, 0
+
+; This macro prints out pass if the Z flag is clear
+; and fail if the Z flag is set.
+!macro assert_not_equal {
+    beq .testfail
+    lda #<pass
+    sta+1 straddr
+    lda #>pass
+    sta+1 straddr + 1
+    jmp .end
+.testfail:
+    lda #<fail
+    sta+1 straddr
+    lda #>fail
+    sta+1 straddr + 1
+.end
+    jsr subprint
+}
+
+; This macro prints out pass if the Z flag is set
+; and fail if the Z flag is clear.  Called after
+; math_isequal.
+!macro assert_equal {
+    bne .testfail
+    lda #<pass
+    sta+1 straddr
+    lda #>pass
+    sta+1 straddr + 1 
+    jmp .end
+.testfail:
+    lda #<fail
+    sta+1 straddr
+    lda #>fail
+    sta+1 straddr + 1 
+.end
+    jsr subprint
+}
+
+; Clear screen before running tests
+.run
+    jsr subclearscreen
+    jmp test1
+
+;
+; Test 1: add 2 2-byte integers
+;
+.a1=*
+!byte $2d, $45
+.a2=*
+!byte $0e, $08
+.expectedsum=*
+!byte $3b, $4d
+.actualsum=*
+!byte $00, $00
+.l1 !scr "one: ",0
+
+test1
+    +print_label .l1
+    lda #$02                             ; set precision
+    sta mathprec
+    +set_param_add .a1, .a2, .actualsum
+
+    jsr math_add
+
+    +set_param_isequal 2, .expectedsum, .actualsum
+    jsr math_isequal
+    +assert_equal;
+
+    jmp test2
+
+; 
+; Test 2: Add two 4-byte integers
+;
+.b1=*
+!byte $4b, $1e, $1e, $5c
+.b2=*
+!byte $0d, $48, $09, $2e
+.expectedsum2=*
+!byte $58, $66, $27, $8A
+.actualsum2=*
+!fill 4, 0
+.l2 !scr "two: ", 0
+
+test2
+    +print_label .l2
+    lda #$04           ; set precision
+    sta mathprec
+    +set_param_add .b1, .b2, .actualsum2
+
+    jsr math_add
+
+    +set_param_isequal 4, .expectedsum2, .actualsum2
+    jsr math_isequal
+    +assert_equal;
+
+    jmp test3
+
+; 
+; Test 3: Add two 4-byte integers, with overflow
+;
+.c1=*
+!byte $51, $40, $5d, $f6
+.c2=*
+!byte $4e, $1a, $41, $16
+.actualsum3=*
+!fill 4, 0
+.l3 !scr "overflow is expected", 13, "three: ", 0
+
+test3
+    +print_label .l3
+    lda #$04           ; set precision
+    sta mathprec
+    +set_param_add .c1, .c2, .actualsum3
+
+    jsr math_add       ; overflow is expected
+
+    rts
+
+!source "../libs/preamble.a"
+!source "../libs/screen.a"
+

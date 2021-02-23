@@ -1,7 +1,9 @@
 ; Arithmetic routines
 
+!source "../libs/preamble.a"
+
 !zone arithmetic {
-overflow !scr "Integer overflow", 13, 0
+overflow !scr "integer overflow", 13, 0
 
 ; Compares two integers for equality
 ; Memory at the following labels is used
@@ -24,5 +26,50 @@ math_isequal:
     lda #$00        ; set Z flag
 .end 
     rts
+
+!zone add {
+; This macro sets parameters for the math_add subroutine.
+!macro set_param_add .a1, .a2, .sum {
+   lda #<.a1         ; copy pointer for first addend
+   sta mathop1
+   lda #>.a1
+   sta mathop1 + 1
+   lda #<.a2         ; copy pointer for second addend
+   sta mathop2
+   lda #>.a2
+   sta mathop2 + 1
+   lda #<.sum        ; copy pointer for sum
+   sta mathres
+   lda #>.sum
+   sta mathres + 1
+}
+
+; Add two unsigned integers
+; Memory at the following labels is used
+;    mathprec: number of bytes in each integer
+;    mathop1: pointer to first addend
+;    mathop2: pointer to second addend
+;    mathres: pointer to memory for the sum
+math_add:
+   ldx mathprec;
+   clc
+   ldy #$00        ; y will be index into the addends
+.nextdigit
+   lda (mathop1), y  ; load byte of first addend
+   adc (mathop2), y  ; add byte of second addend
+   sta (mathres), y  ; store byte of sum
+   iny
+   dex
+   bne .nextdigit
+   bcs .error
+   rts
+.error
+   lda #<overflow
+   sta straddr
+   lda #>overflow
+   sta straddr + 1
+   jsr subprint
+   jmp $E37B       ; drop back to READY
+}  ; end of zone add
 }
 
