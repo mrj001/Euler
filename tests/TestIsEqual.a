@@ -41,6 +41,24 @@
 pass !scr "pass", 13, 0
 fail !scr "fail", 13, 0
 
+; This macro prints out pass if the Z flag is set
+; and fail if the Z flag is clear.
+!macro assert_equal {
+    bne .testfail
+    lda #<pass
+    sta+1 straddr
+    lda #>pass
+    sta+1 straddr + 1
+    jmp .end
+.testfail:
+    lda #<fail
+    sta+1 straddr
+    lda #>fail
+    sta+1 straddr + 1
+.end
+    jsr subprint
+}
+
 ; This macro prints out pass if the Z flag is clear
 ; and fail if the Z flag is set.
 !macro assert_not_equal {
@@ -116,7 +134,7 @@ fail !scr "fail", 13, 0
 
     jsr math_isequal
 
-    +assert_not_equal
+    +assert_equal
 
     rts           ; TODO add additional tests
 
