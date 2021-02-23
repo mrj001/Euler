@@ -8,3 +8,8 @@ tmpaddr = $02
 ; two bytes to pass a pointer to a string to the print subroutine
 straddr = $04
 
+; pointers to math operands
+mathprec = $06  ; number of bytes in an integer
+mathop1 = $07   ; pointer to first operand
+mathop2 = $09   ; pointer to second operand
+mathres = $0B   ; pointer to result

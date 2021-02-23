@@ -1,0 +1,28 @@
+; Arithmetic routines
+
+!zone arithmetic {
+overflow !scr "Integer overflow", 13, 0
+
+; Compares two integers for equality
+; Memory at the following labels is used
+;    mathprec: number of bytes in each integer
+;    mathop1: pointer to first integer to compare
+;    mathop2: pointer to second integer to compare
+;
+; If they are equal the Z flag will be set 
+; after execution; otherwise the Z flag will be cleared.
+math_isequal:
+    lda+1 mathprec  ; load count of bytes per integer
+    tay             ; y will index the bytes of each integer
+    dey             ; y should be zero-based.
+.nextdigit
+    lda (mathop1), y
+    cmp (mathop2), y
+    bne .end        ; not equal; return with Z flag cleared
+    dey             ; will set/clear Z flag.
+    bpl .nextdigit
+    lda #$00        ; set Z flag
+.end 
+    rts
+}
+

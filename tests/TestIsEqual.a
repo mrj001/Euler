@@ -1,0 +1,73 @@
+;@com.wudsn.ide.asm.hardware=C64
+!to "TestIsEqual.prg", cbm 
+!cpu 6510
+
+; BASIC program: (Where .run is replaced by its address.)
+;   10 SYS .run
+* = $0801
+    !byte <.basend,>.basend,$0A,$00,$9e
+    !byte .run/10000 + '0'    
+    !byte .run/1000 % 10 + '0'    
+    !byte .run/100 % 10 + '0'   
+    !byte .run/10 % 10 + '0' 
+    !byte .run % 10 + '0' 
+    !byte 0
+.basend !byte 0, 0
+
+.pass !scr "pass", 13, 0
+.fail !scr "fail", 13, 0
+
+;
+; Test 1: add two single byte integers
+;
+.a1=*
+!byte 5
+.a2=*
+!byte 52
+.l1 !scr "one: ", 0
+
+.run
+    jsr subclearscreen
+
+    ; print out test label
+    lda #<.l1
+    sta+1 straddr
+    lda #>.l1
+    sta+1 straddr + 1
+    jsr subprint
+
+    ; push test 1 parameters
+    lda #$01          ; set precision to 1
+    sta+1 mathprec
+    lda #<.a1          ; operand 1
+    sta+1 mathop1
+    lda #>.a1
+    sta+1 mathop1 + 1
+    lda #<.a2          ; operand 2
+    sta+1 mathop2
+    lda #>.a2
+    sta+1 mathop2 + 1
+
+    jsr math_isequal
+
+    ; print out test result.
+    ; this test is hard-coded to require "not equals" as the answer
+    beq .t1fail
+    lda #<.pass
+    sta+1 straddr
+    lda #>.pass
+    sta+1 straddr + 1
+    jmp .end1
+.t1fail:
+    lda #<.fail
+    sta+1 straddr
+    lda #>.fail
+    sta+1 straddr + 1
+.end1
+    jsr subprint
+    rts           ; TODO add additional tests
+
+!source "../libs/preamble.a"
+!source "../libs/screen.a"
+!source "../libs/arithmetic.a"
+
