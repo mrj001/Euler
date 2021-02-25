@@ -1,6 +1,7 @@
 ; Arithmetic routines
 
 !source "../libs/preamble.a"
+!source "../libs/screen.a"
 
 !zone arithmetic {
 overflow !scr "integer overflow", 13, 0
@@ -71,5 +72,38 @@ math_add:
    jsr subprint
    jmp $E37B       ; drop back to READY
 }  ; end of zone add
+
+!zone rotate_left {
+; This macro sets parameters for the rotate left subroutine
+!macro set_param_rol .a {
+   lda #<.a
+   sta mathop1
+   lda #>.a
+   sta mathop1 + 1
+}
+
+; Rotate an unsigned integer one bit to the left
+; On return, the carry flag will contain the most 
+; significant bit of the integer.
+; Memory at the following labels is used
+;    mathprec: number of bytes in each integer
+;    mathop1:  pointer to the number to rotate
+math_rol:
+    ldx mathprec      ; x will be loop counter
+    ldy #$00          ; y is an index into the integer's bytes
+    lda (mathop1), y  ; shift the least significant byte
+    asl
+    sta (mathop1), y
+.loop
+    dex               ; check for end of loop
+    beq .end
+    iny               ; next byte
+    lda (mathop1), y  ; shift a byte
+    rol
+    sta (mathop1), y
+    jmp .loop
+.end
+    rts
+}  ; end of zone rotate_left
 }
 
