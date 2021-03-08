@@ -13,3 +13,13 @@ mathprec = $06  ; number of bytes in an integer
 mathop1 = $07   ; pointer to first operand
 mathop2 = $09   ; pointer to second operand
 mathres = $0B   ; pointer to result
+
+; number of bytes needed for BCD representation of integer
+; Note: this is a function of mathprec.  For example:
+; mathprec  bcd
+;   1        2
+;   2        3
+;   4        5
+;   8        10
+mathbcdprec = $0D
+

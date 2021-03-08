@@ -1,0 +1,188 @@
+;@com.wudsn.ide.asm.hardware=C64
+!to "TestBCD.prg", cbm 
+!cpu 6510
+!sl "TestBCD.labels"
+
+; BASIC program: (Where .run is replaced by its address.)
+;   10 SYS .run
+* = $0801
+    !byte <.basend,>.basend,$0A,$00,$9e
+    !byte .run/10000 + '0'    
+    !byte .run/1000 % 10 + '0'    
+    !byte .run/100 % 10 + '0'   
+    !byte .run/10 % 10 + '0' 
+    !byte .run % 10 + '0' 
+    !byte 0
+.basend !byte 0, 0
+
+!source "../libs/arithmetic.a"
+
+; This macro prints the label for the current test
+!macro print_label .lbl {
+    lda #<.lbl
+    sta+1 straddr
+    lda #>.lbl
+    sta+1 straddr + 1 
+    jsr subprint
+}
+
+; This macro sets the parameters for the math_isequal subroutine.
+!macro set_param_isequal .prec, .op1, .op2 {
+    lda #.prec         ; set precision to .prec
+    sta+1 mathprec
+    lda #<.op1         ; operand 1
+    sta+1 mathop1
+    lda #>.op1
+    sta+1 mathop1 + 1 
+    lda #<.op2         ; operand 2
+    sta+1 mathop2
+    lda #>.op2
+    sta+1 mathop2 + 1 
+}
+
+pass !scr "pass", 13, 0
+fail !scr "fail", 13, 0
+
+; Clear screen before running tests
+.run
+    jsr subclearscreen
+    jmp test1
+
+!zone test1 {
+;
+; Test 1: convert a single byte to BCD
+;
+.a1=*
+!byte $2a
+.expected1=*
+!byte $42, $00
+.actual1=*
+!byte $00, $00
+.l1 !scr "one: ",0
+
+test1
+    +print_label .l1
+    lda #$01                             ; set precision
+    sta mathprec
+    lda #$02                             ; set BCD precision
+    sta mathbcdprec
+    +set_param_bcd .a1, .actual1
+
+    jsr math_bcd
+
+    ; check results
+    +set_param_isequal .expected1, .actual1
+    jsr math_isequal
+    bne .fail
+
+.pass
+    lda #<pass
+    sta straddr
+    lda #>pass
+    sta straddr + 1
+    jmp .output
+
+.fail
+    lda #<fail
+    sta straddr
+    lda #>fail
+    sta straddr + 1
+
+.output
+    jsr subprint
+
+    jmp test2
+}
+
+!zone test2 {
+;
+; Test 2: TODO
+;
+.a2=*
+!byte $c1, $06
+.expected2=*
+!byte $29, $17
+.actual2=*
+!byte $00, $00, $00
+.l2 !scr "two: ",0
+
+test2
+    +print_label .l2
+    lda #$02                             ; set precision
+    sta mathprec
+    lda #$03                             ; set BCD precision
+    sta mathbcdprec
+    +set_param_bcd .a2, .actual2
+
+    jsr math_bcd
+
+    ; check results
+    +set_param_isequal .expected2, .actual2
+    jsr math_isequal
+    bne .fail
+
+.pass
+    lda #<pass
+    sta straddr
+    lda #>pass
+    sta straddr + 1
+    jmp .output
+
+.fail
+    lda #<fail
+    sta straddr
+    lda #>fail
+    sta straddr + 1
+
+.output
+    jsr subprint
+
+    jmp test3
+}
+
+
+!zone test3 {
+;
+; Test 3: TODO
+;
+.a3=*
+!byte $11, $07, $2b, $2e
+.expected3=*
+!byte $93, $17, $57, $74, $07
+.actual3=*
+!byte $00, $00, $00, $00, $00
+.l3 !scr "three: ",0
+
+test3
+    +print_label .l3
+    lda #$04                             ; set precision
+    sta mathprec
+    lda #$05                             ; set BCD precision
+    sta mathbcdprec
+    +set_param_bcd .a3, .actual3
+
+    jsr math_bcd
+
+    ; check results
+    +set_param_isequal .expected3, .actual3
+    jsr math_isequal
+    bne .fail
+
+.pass
+    lda #<pass
+    sta straddr
+    lda #>pass
+    sta straddr + 1
+    jmp .output
+
+.fail
+    lda #<fail
+    sta straddr
+    lda #>fail
+    sta straddr + 1
+
+.output
+    jsr subprint
+
+    rts
+}

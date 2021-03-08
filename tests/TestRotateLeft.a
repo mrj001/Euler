@@ -101,6 +101,8 @@ test1
 !byte $d2
 .expected2=*
 !byte $a4
+.actual2=*
+!byte $00, $00, $00
 .l2 !scr "two: ",0
 
 test2
