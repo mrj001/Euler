@@ -101,4 +101,104 @@ subclearscreen
 
     rts
 
+; output the character in the Accumulator to the current
+; screen position.  Advance the position by one character.
+; Changes the content of tmpaddr
+subprintonechar:
+    ldy .currow       ; Copy the current row pointer to zero page
+    sty tmpaddr
+    ldy .currow + 1
+    sty tmpaddr + 1
+    ldy .curcol
+    sta (tmpaddr), y  ; store the character in the current screen position
+    iny
+    sty .curcol
+    cpy #.screencols  ; have we reached the end of the line?
+    bne .done
+    clc               ; advance to next row
+    tya
+    adc .currow
+    sta .currow
+    adc .currow + 1
+    sta .currow + 1
+    ldy #$00
+    sty .curcol
+; TODO check for end of screen
+.done:
+    rts
+
+!zone outputBCD {
+!macro set_param_outputBCD .ptr, .bcdprec {
+   ldy #<.ptr
+   sty mathres
+   ldy #>.ptr
+   sty mathres + 1
+   ldy #.bcdprec
+   ; sty mathbcdprec
+}
+
+; outputs a BCD number, with leading zeroes suppressed
+; Memory at the following labels is used as input
+;    mathres:  pointer to the Binary-Coded Decimal number
+;    mathbcdprec: contains the number of bytes in the BCD number
+; The BCD number is in little endian format
+.zero_suppress=*
+!byte $00
+.tx=*
+!byte $00
+.ty=*
+!byte $00
+
+sub_outputBCD:
+    ; ldy mathbcdprec     ; load y with number of bytes
+    dey                 ; y is zero-based index.
+    lda #$00            ; suppress leading zeroes
+    sta .zero_suppress
+
+    ; output high nybble
+.dohi:
+    lda (mathres), y    ; load current byte
+    lsr                 ; isolate high 4 bits
+    lsr
+    lsr
+    lsr
+    ldx .zero_suppress  ; check for leading zero suppression
+    bne .outhi          ; if not zero, it must be output
+    cmp #$00            ; Is A == 0?
+    beq .dolo           ; A == 0 && suppressing...
+    inc .zero_suppress  ; no longer suppressing zeroes
+
+.outhi:
+    ora #$30            ; convert Binary-Coded digit to C64 screen code
+    stx .tx
+    sty .ty
+    jsr subprintonechar
+    ldy .ty
+    ldx .tx
+
+.dolo:
+    lda (mathres), y    ; load current byte
+    and #$0F            ; isolate low-order 4 bits
+    ldx .zero_suppress  ; check for leading zero suppression
+    bne .outlo          ; branch if not suppressing
+    cmp #$00            ; Is A == 0?
+    beq .donebyte       ; A == 0 && suppressing...
+    inc .zero_suppress  ; no longer suppressing zeroes
+
+.outlo
+    ora #$30            ; convert Binary-Coded digit to C64 screen code
+    stx .tx
+    sty .ty
+    jsr subprintonechar
+    ldy .ty
+    ldx .tx
+
+.donebyte
+   dey                  ; next byte
+   bpl .dohi
+
+   rts
+    
+}  ; end zone outputBCD
 }  ; end zone screen
+
