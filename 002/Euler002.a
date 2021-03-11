@@ -1,0 +1,126 @@
+;@com.wudsn.ide.asm.hardware=C64
+!to "Euler002.prg", cbm 
+!cpu 6510
+!sl "Euler002.labels"
+
+; BASIC program: (Where .run is replaced by its address.)
+;   10 SYS .run
+* = $0801
+    !byte <.basend,>.basend,$0A,$00,$9e
+    !byte .run/10000 + '0'    
+    !byte .run/1000 % 10 + '0'    
+    !byte .run/100 % 10 + '0'   
+    !byte .run/10 % 10 + '0' 
+    !byte .run % 10 + '0' 
+    !byte 0
+.basend !byte 0, 0
+
+!source "../libs/preamble.a"
+!source "../libs/arithmetic.a"
+
+; This macro prints a string
+!macro print_label .lbl {
+    lda #<.lbl
+    sta+1 straddr
+    lda #>.lbl
+    sta+1 straddr + 1
+    jsr subprint
+}
+
+; This macro sets the parameters for the math_compare subroutine.
+!macro set_param .prec, .op1, .op2 {
+    lda #.prec         ; set precision to .prec
+    sta+1 mathprec
+    lda #<.op1         ; operand 1
+    sta+1 mathop1
+    lda #>.op1
+    sta+1 mathop1 + 1
+    lda #<.op2         ; operand 2
+    sta+1 mathop2
+    lda #>.op2
+    sta+1 mathop2 + 1
+}
+
+.data=*
+.lbl !scr "the answer is ", 0
+
+.f1=*
+!byte 0, 0, 0
+
+.f2=*
+!byte 1, 0, 0
+
+.ftmp=*
+!byte 1, 0, 0
+
+.sum=*
+!byte 0, 0, 0
+
+; current Fibonacci number being calculated.
+.fibnum=*
+!byte 2
+
+; limit is 4,000,000
+.limit=*
+!byte $00, $09, $3d
+
+; memory for holding the BCD version of the result
+.bcd=*
+!byte 0, 0, 0, 0
+
+
+.run:
+   lda #$03          ; set arithmetic precision
+   sta mathprec
+
+;
+;   f1 = f2 && f2 == ftmp
+;
+.fibonacci_loop:
+   ldy mathprec
+   dey
+.copy:
+   lda .f2, y
+   sta .f1, y
+   lda .ftmp, y
+   sta .f2, y
+   dey
+   bpl .copy
+
+; 
+; increment index of Fibonacci number being calculated
+;
+   inc .fibnum
+
+;
+; ftmp = f1 + f2
+;
+   +set_param_add .f1, .f2, .ftmp
+   jsr math_add
+
+;
+;  Is ftmp >= limit?
+; 
+   +set_param_isequal .ftmp, .limit
+   jsr math_compare
+   bmi .fibonacci_loop
+
+;
+; output results
+;
+   jsr subclearscreen
+   lda #<.lbl
+   sta straddr
+   lda #>.lbl
+   sta straddr + 1
+   jsr subprint
+
+   lda #$04            ; Set number of BCD bytes
+   sta mathbcdprec
+   +set_param_bcd .ftmp, .bcd
+   jsr math_bcd
+   +set_param_outputBCD .bcd, 4
+   jsr sub_outputBCD
+
+   rts
+
