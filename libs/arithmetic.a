@@ -39,6 +39,33 @@ math_isequal:
 .end 
     rts
 
+!zone compare {
+; Set flags N, Z & C as though a subtraction of a multi-byte integer
+; had been done.  (i.e. op1 - op2).  Unlike an actual subtraction,
+; the V flag is not affected.
+; This is analogous to a CMP, but for multiple bytes.
+; Memory at the following labels is used
+;    mathprec: number of bytes in each integer
+;    mathop1: pointer to first integer to compare
+;    mathop2: pointer to second integer to compare
+math_compare:
+    ldy mathprec    ; load count of bytes per integer
+    dey             ; index will be zero-based
+    php             ; needed for correct stack usage
+.nextbyte:
+    plp             ; offset push of flags at end of loop
+    lda (mathop1), y
+    cmp (mathop2), y
+    bne .end        ; not equal - flags are set
+    php             ; preserve flags
+    dey             ; will alter N & Z flags
+    bpl .nextbyte
+    plp             ; restore flags from last byte comparison
+.end
+    rts
+}
+
+
 !zone add {
 ; This macro sets parameters for the math_add subroutine.
 !macro set_param_add .a1, .a2, .sum {

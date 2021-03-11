@@ -1,0 +1,288 @@
+;@com.wudsn.ide.asm.hardware=C64
+!to "TestCompare.prg", cbm 
+!cpu 6510
+!sl "TestCompare.labels"
+
+; BASIC program: (Where .run is replaced by its address.)
+;   10 SYS .run
+* = $0801
+    !byte <.basend,>.basend,$0A,$00,$9e
+    !byte .run/10000 + '0'    
+    !byte .run/1000 % 10 + '0'    
+    !byte .run/100 % 10 + '0'   
+    !byte .run/10 % 10 + '0' 
+    !byte .run % 10 + '0' 
+    !byte 0
+.basend !byte 0, 0
+
+!source "../libs/preamble.a"
+!source "../libs/arithmetic.a"
+
+; This macro prints the label for the current test
+!macro print_label .lbl {
+    lda #<.lbl
+    sta+1 straddr
+    lda #>.lbl
+    sta+1 straddr + 1
+    jsr subprint
+}
+
+; This macro sets the parameters for the math_compare subroutine.
+!macro set_param .prec, .op1, .op2 {
+    lda #.prec         ; set precision to .prec
+    sta+1 mathprec
+    lda #<.op1         ; operand 1
+    sta+1 mathop1
+    lda #>.op1
+    sta+1 mathop1 + 1
+    lda #<.op2         ; operand 2
+    sta+1 mathop2
+    lda #>.op2
+    sta+1 mathop2 + 1
+}
+
+pass !scr "pass", 13, 0
+fail !scr "fail", 13, 0
+
+; The flag mask contains a 1 bit for each of the
+; processor flags in which we are interested (N, Z, & C)
+; N = $80
+; Z = $02
+; C = $01
+flagmask=*
+!byte $83
+
+.run:
+   jmp test1
+
+!zone test1 {
+;
+; Test 1: Compare two single byte integers, op1 > op2
+;
+.a1=*
+!byte 5
+.a2=*
+!byte 52
+.expected=$80  ; N set; Z & C clear
+.l1 !scr "one: ", 0
+
+test1:
+    jsr subclearscreen
+
+    ; set up
+    +print_label .l1
+    +set_param 1, .a1, .a2
+
+    ; action
+    jsr math_compare
+
+    ; assert
+    php         ; transfer flags to A
+    pla
+    and flagmask
+    cmp #.expected
+    bne .fail
+
+.pass
+    lda #<pass
+    sta straddr
+    lda #>pass
+    sta straddr + 1
+    jmp .result
+
+.fail
+    lda #<fail
+    sta straddr
+    lda #>fail
+    sta straddr + 1
+
+.result
+    jsr subprint
+
+    jmp test2
+}
+
+!zone test2 {
+;
+; Test 2: Compare two single byte integers, op1 < op2
+;
+.a1=*
+!byte 54
+.a2=*
+!byte 10
+.expected=$01  ; N & Z clear; C set
+.lbl !scr "two: ", 0
+
+test2:
+    ; set up
+    +print_label .lbl
+    +set_param 1, .a1, .a2
+
+    ; action
+    jsr math_compare
+
+    ; assert
+    php         ; transfer flags to A
+    pla
+    and flagmask
+    cmp #.expected
+    bne .fail
+
+.pass
+    lda #<pass
+    sta straddr
+    lda #>pass
+    sta straddr + 1
+    jmp .result
+
+.fail
+    lda #<fail
+    sta straddr
+    lda #>fail
+    sta straddr + 1
+
+.result
+    jsr subprint
+
+    jmp test3
+}
+
+!zone test3 {
+;
+; Test 3: Compare 2 five byte integers that are equal
+;
+.a1=*
+!byte $2a, $df, $b3, $6c, $81
+.a2=*
+!byte $2a, $df, $b3, $6c, $81
+.expected=$03  ; N clear; Z & C set
+.lbl !scr "three: ", 0
+
+test3:
+    ; set up
+    +print_label .lbl
+    +set_param 5, .a1, .a2
+
+    ; action
+    jsr math_compare
+
+    ; assert
+    php         ; transfer flags to A
+    pla
+    and flagmask
+    cmp #.expected
+    bne .fail
+
+.pass
+    lda #<pass
+    sta straddr
+    lda #>pass
+    sta straddr + 1
+    jmp .result
+
+.fail
+    lda #<fail
+    sta straddr
+    lda #>fail
+    sta straddr + 1
+
+.result
+    jsr subprint
+
+    jmp test4
+}
+
+!zone test4 {
+;
+; Test 4: Compare 2 three byte integers that differ in their first byte
+;   op1 < op2
+;  (Shows that comparison does not proceed to subsequent equal bytes.)
+;
+.a1=*
+!byte $af, $82, $fd
+.a2=*
+!byte $bf, $82, $fd
+.expected=$80  ; N set; Z & C clear
+.lbl !scr "four: ", 0
+
+test4:
+    ; set up
+    +print_label .lbl
+    +set_param 3, .a1, .a2
+
+    ; action
+    jsr math_compare
+
+    ; assert
+    php         ; transfer flags to A
+    pla
+    and flagmask
+    cmp #.expected
+    bne .fail
+
+.pass
+    lda #<pass
+    sta straddr
+    lda #>pass
+    sta straddr + 1
+    jmp .result
+
+.fail
+    lda #<fail
+    sta straddr
+    lda #>fail
+    sta straddr + 1
+
+.result
+    jsr subprint
+
+    jmp test5
+}
+
+!zone test5 {
+;
+; Test 5: Compare 2 three byte integers that differ in their last byte
+;   op1 > op2
+;  (Shows that comparison includes all bytes until a difference is found.)
+;
+.a1=*
+!byte $14, $d4, $d1
+.a2=*
+!byte $14, $d4, $d0
+.expected=$01  ; N & Z clear; C set
+.lbl !scr "five: ", 0
+
+test5:
+    ; set up
+    +print_label .lbl
+    +set_param 3, .a1, .a2
+
+    ; action
+    jsr math_compare
+
+    ; assert
+    php         ; transfer flags to A
+    pla
+    and flagmask
+    cmp #.expected
+    bne .fail
+
+.pass
+    lda #<pass
+    sta straddr
+    lda #>pass
+    sta straddr + 1
+    jmp .result
+
+.fail
+    lda #<fail
+    sta straddr
+    lda #>fail
+    sta straddr + 1
+
+.result
+    jsr subprint
+
+    rts
+}
+
