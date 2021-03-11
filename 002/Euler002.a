@@ -87,6 +87,16 @@
    dey
    bpl .copy
 
+;
+;  Is f2 even?
+;
+   lda .f2
+   and #$01
+   bne .noteven
+   +set_param_add .f2, .sum, .sum
+   jsr math_add
+.noteven:
+
 ; 
 ; increment index of Fibonacci number being calculated
 ;
@@ -115,11 +125,11 @@
    sta straddr + 1
    jsr subprint
 
-   lda #$04            ; Set number of BCD bytes
+   lda #$04                     ; Set number of BCD bytes
    sta mathbcdprec
-   +set_param_bcd .ftmp, .bcd
+   +set_param_bcd .sum, .bcd    ; convert answer to BCD
    jsr math_bcd
-   +set_param_outputBCD .bcd, 4
+   +set_param_outputBCD .bcd, 4 ; output answer
    jsr sub_outputBCD
 
    rts
