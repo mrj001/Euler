@@ -225,7 +225,7 @@ math_bcd:
 ;  Y: Multiplier, not preserved
 ;  X: not used
 ; Returns:
-;  product contains the 16-bit result
+;  product_byte contains the 16-bit result
 ;
 product_byte=*
 !byte $00, $00
