@@ -216,5 +216,65 @@ math_bcd:
 
    rts
 }  ; end of zone bcd
+
+!zone multiply_byte {
+;
+; Multiplies two one-byte integers, returning a two-byte product
+; Registers:
+;  A: Multiplicand, not preserved
+;  Y: Multiplier, not preserved
+;  X: not used
+; Returns:
+;  product contains the 16-bit result
+;
+product_byte=*
+!byte $00, $00
+.m1=*
+!byte $00
+.m2=*
+!byte $00, $00
+
+math_multiply_byte:
+   sta .m1
+   sty .m2
+   lda #$00
+   sta .m2 + 1
+   sta product_byte
+   sta product_byte + 1
+
+;
+; Is m1 even?
+;
+.loop:
+   lda #$01
+   bit .m1
+   beq .skipadd
+
+;
+; Add m2 to product_byte
+;
+   clc
+   lda .m2
+   adc product_byte
+   sta product_byte
+   lda .m2 + 1
+   adc product_byte + 1
+   sta product_byte + 1
+
+;
+; double m2
+;
+.skipadd
+   asl .m2
+   rol .m2 + 1
+
+;
+; halve m1
+;
+   lsr .m1
+   bne .loop
+   rts
+
+}  ; end of zone multiply_byte
 }
 
