@@ -15,8 +15,8 @@
     !byte 0
 .basend !byte 0, 0
 
-!source "../libs/preamble.a"
-!source "../libs/arithmetic.a"
+!source "preamble.a"
+!source "arithmetic.a"
 
 ; This macro prints a string
 !macro print_label .lbl {

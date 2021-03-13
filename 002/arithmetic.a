@@ -1,0 +1,280 @@
+; Arithmetic routines
+
+!source "preamble.a"
+!source "screen.a"
+
+!zone arithmetic {
+overflow !scr "integer overflow", 13, 0
+
+!macro set_param_isequal .a, .b {
+    lda #<.a
+    sta mathop1
+    lda #>.a
+    sta mathop1 + 1
+    lda #<.b
+    sta mathop2
+    lda #>.b
+    sta mathop2 + 1
+}
+
+; Compares two integers for equality
+; Memory at the following labels is used
+;    mathprec: number of bytes in each integer
+;    mathop1: pointer to first integer to compare
+;    mathop2: pointer to second integer to compare
+;
+; If they are equal the Z flag will be set 
+; after execution; otherwise the Z flag will be cleared.
+math_isequal:
+    lda+1 mathprec  ; load count of bytes per integer
+    tay             ; y will index the bytes of each integer
+    dey             ; y should be zero-based.
+.nextdigit
+    lda (mathop1), y
+    cmp (mathop2), y
+    bne .end        ; not equal; return with Z flag cleared
+    dey             ; will set/clear Z flag.
+    bpl .nextdigit
+    lda #$00        ; set Z flag
+.end 
+    rts
+
+!zone compare {
+; Set flags N, Z & C as though a subtraction of a multi-byte integer
+; had been done.  (i.e. op1 - op2).  Unlike an actual subtraction,
+; the V flag is not affected.
+; This is analogous to a CMP, but for multiple bytes.
+; Memory at the following labels is used
+;    mathprec: number of bytes in each integer
+;    mathop1: pointer to first integer to compare
+;    mathop2: pointer to second integer to compare
+math_compare:
+    ldy mathprec    ; load count of bytes per integer
+    dey             ; index will be zero-based
+    php             ; needed for correct stack usage
+.nextbyte:
+    plp             ; offset push of flags at end of loop
+    lda (mathop1), y
+    cmp (mathop2), y
+    bne .end        ; not equal - flags are set
+    php             ; preserve flags
+    dey             ; will alter N & Z flags
+    bpl .nextbyte
+    plp             ; restore flags from last byte comparison
+.end
+    rts
+}
+
+
+!zone add {
+; This macro sets parameters for the math_add subroutine.
+!macro set_param_add .a1, .a2, .sum {
+   lda #<.a1         ; copy pointer for first addend
+   sta mathop1
+   lda #>.a1
+   sta mathop1 + 1
+   lda #<.a2         ; copy pointer for second addend
+   sta mathop2
+   lda #>.a2
+   sta mathop2 + 1
+   lda #<.sum        ; copy pointer for sum
+   sta mathres
+   lda #>.sum
+   sta mathres + 1
+}
+
+; Add two unsigned integers
+; Memory at the following labels is used
+;    mathprec: number of bytes in each integer
+;    mathop1: pointer to first addend
+;    mathop2: pointer to second addend
+;    mathres: pointer to memory for the sum
+math_add:
+   ldx mathprec;
+   clc
+   ldy #$00        ; y will be index into the addends
+.nextdigit
+   lda (mathop1), y  ; load byte of first addend
+   adc (mathop2), y  ; add byte of second addend
+   sta (mathres), y  ; store byte of sum
+   iny
+   dex
+   bne .nextdigit
+   bcs .error
+   rts
+.error
+   lda #<overflow
+   sta straddr
+   lda #>overflow
+   sta straddr + 1
+   jsr subprint
+   jmp $E37B       ; drop back to READY
+}  ; end of zone add
+
+!zone rotate_left {
+; This macro sets parameters for the rotate left subroutine
+!macro set_param_rol .a {
+   lda #<.a
+   sta mathop1
+   lda #>.a
+   sta mathop1 + 1
+}
+
+; Rotate an unsigned integer one bit to the left
+; On return, the carry flag will contain the most 
+; significant bit of the integer.
+; Memory at the following labels is used
+;    mathprec: number of bytes in each integer
+;    mathop1:  pointer to the number to rotate
+math_rol:
+    ldx mathprec      ; x will be loop counter
+    ldy #$00          ; y is an index into the integer's bytes
+    lda (mathop1), y  ; shift the least significant byte
+    asl
+    sta (mathop1), y
+.loop
+    dex               ; check for end of loop
+    beq .end
+    iny               ; next byte
+    lda (mathop1), y  ; shift a byte
+    rol
+    sta (mathop1), y
+    jmp .loop
+.end
+    rts
+}  ; end of zone rotate_left
+
+!zone bcd {
+!macro set_param_bcd .a, .res {
+   lda #<.a          ; set up pointer to binary input
+   sta mathop1
+   lda #>.a
+   sta mathop1 + 1
+   lda #<.res        ; set up pointer to result
+   sta mathres
+   lda #>.res
+   sta mathres + 1
+}
+
+; Convert a number to BCD.
+;
+; Memory at the following labels is used as input
+;    mathprec: number of bytes in each integer
+;    mathop1:  pointer to the number to rotate (destructive)
+;    mathres:  pointer to the memory to receive the result.
+;
+; Memory at the following labels is used internally:
+;    tmpaddr: used to save X & Y during subroutine calls
+; Notes:
+;  1. the output may require more bytes than the input.
+
+math_bcd:
+   lda #$00         ; zero out result area
+   ldy mathbcdprec
+   dey
+.zero_loop
+   sta (mathres), y
+   dey
+   bpl .zero_loop
+
+   ldy mathprec     ; number of bytes to convert
+   ldx #$08         ; number of bits in a byte
+
+.byte_loop:
+   sty tmpaddr      ; preserve x & y
+.bit_loop:
+   stx tmpaddr + 1
+
+   jsr math_rol     ; load Most Significant Bit into Carry
+
+   ; Add bit to the result
+   sei
+   sed
+   ldy #$00
+   ldx mathbcdprec
+.add_loop:
+   lda (mathres), y
+   adc (mathres), y
+   sta (mathres), y
+   iny
+   dex
+   bne .add_loop
+   cld
+   cli
+
+   ldy tmpaddr     ; retrieve X & Y
+   ldx tmpaddr + 1
+
+   ; proceed to next bit of current input byte
+   dex
+   bne .bit_loop
+
+   ; proceed to next input byte
+   ldx #$08           ; 8 bits in a byte
+   dey
+   bne .byte_loop
+
+   rts
+}  ; end of zone bcd
+
+!zone multiply_byte {
+;
+; Multiplies two one-byte integers, returning a two-byte product
+; Registers:
+;  A: Multiplicand, not preserved
+;  Y: Multiplier, not preserved
+;  X: not used
+; Returns:
+;  product_byte contains the 16-bit result
+;
+product_byte=*
+!byte $00, $00
+.m1=*
+!byte $00
+.m2=*
+!byte $00, $00
+
+math_multiply_byte:
+   sta .m1
+   sty .m2
+   lda #$00
+   sta .m2 + 1
+   sta product_byte
+   sta product_byte + 1
+
+;
+; Is m1 even?
+;
+.loop:
+   lda #$01
+   bit .m1
+   beq .skipadd
+
+;
+; Add m2 to product_byte
+;
+   clc
+   lda .m2
+   adc product_byte
+   sta product_byte
+   lda .m2 + 1
+   adc product_byte + 1
+   sta product_byte + 1
+
+;
+; double m2
+;
+.skipadd
+   asl .m2
+   rol .m2 + 1
+
+;
+; halve m1
+;
+   lsr .m1
+   bne .loop
+   rts
+
+}  ; end of zone multiply_byte
+}
+
