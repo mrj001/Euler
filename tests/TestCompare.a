@@ -15,6 +15,9 @@
     !byte 0
 .basend !byte 0, 0
 
+mathprec=$05
+mathbcdprec=$07
+
 !source "../libs/preamble.a"
 !source "../libs/arithmetic.a"
 
@@ -28,9 +31,7 @@
 }
 
 ; This macro sets the parameters for the math_compare subroutine.
-!macro set_param .prec, .op1, .op2 {
-    lda #.prec         ; set precision to .prec
-    sta+1 mathprec
+!macro set_param .op1, .op2 {
     lda #<.op1         ; operand 1
     sta+1 mathop1
     lda #>.op1
@@ -60,9 +61,9 @@ flagmask=*
 ; Test 1: Compare two single byte integers, op1 > op2
 ;
 .a1=*
-!byte 5
+!byte 5, 0, 0, 0, 0
 .a2=*
-!byte 52
+!byte 52, 0, 0, 0
 .expected=$80  ; N set; Z & C clear
 .l1 !scr "one: ", 0
 
@@ -71,7 +72,7 @@ test1:
 
     ; set up
     +print_label .l1
-    +set_param 1, .a1, .a2
+    +set_param .a1, .a2
 
     ; action
     jsr math_compare
@@ -107,16 +108,16 @@ test1:
 ; Test 2: Compare two single byte integers, op1 < op2
 ;
 .a1=*
-!byte 54
+!byte 54, 0, 0, 0, 0
 .a2=*
-!byte 10
+!byte 10, 0, 0, 0, 0
 .expected=$01  ; N & Z clear; C set
 .lbl !scr "two: ", 0
 
 test2:
     ; set up
     +print_label .lbl
-    +set_param 1, .a1, .a2
+    +set_param .a1, .a2
 
     ; action
     jsr math_compare
@@ -161,7 +162,7 @@ test2:
 test3:
     ; set up
     +print_label .lbl
-    +set_param 5, .a1, .a2
+    +set_param .a1, .a2
 
     ; action
     jsr math_compare
@@ -199,16 +200,16 @@ test3:
 ;  (Shows that comparison does not proceed to subsequent equal bytes.)
 ;
 .a1=*
-!byte $af, $82, $fd
+!byte $af, $82, $fd, $00, $00
 .a2=*
-!byte $bf, $82, $fd
+!byte $bf, $82, $fd, $00, $00
 .expected=$80  ; N set; Z & C clear
 .lbl !scr "four: ", 0
 
 test4:
     ; set up
     +print_label .lbl
-    +set_param 3, .a1, .a2
+    +set_param .a1, .a2
 
     ; action
     jsr math_compare
@@ -246,16 +247,16 @@ test4:
 ;  (Shows that comparison includes all bytes until a difference is found.)
 ;
 .a1=*
-!byte $14, $d4, $d1
+!byte $14, $d4, $d1, $00, $00
 .a2=*
-!byte $14, $d4, $d0
+!byte $14, $d4, $d0, $00, $00
 .expected=$01  ; N & Z clear; C set
 .lbl !scr "five: ", 0
 
 test5:
     ; set up
     +print_label .lbl
-    +set_param 3, .a1, .a2
+    +set_param .a1, .a2
 
     ; action
     jsr math_compare

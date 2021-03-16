@@ -15,6 +15,12 @@
     !byte 0
 .basend !byte 0, 0
 
+mathprec=$04
+mathbcdprec=$05
+
+!source "../libs/preamble.a"
+!source "../libs/arithmetic.a"
+
 ; This macro prints the label for the current test
 !macro print_label .lbl {
     lda #<.lbl
@@ -25,9 +31,7 @@
 }
 
 ; This macro sets the parameters for the math_isequal subroutine.
-!macro set_param .prec, .op1, .op2 {
-    lda #.prec         ; set precision to .prec
-    sta+1 mathprec
+!macro set_param .op1, .op2 {
     lda #<.op1         ; operand 1
     sta+1 mathop1
     lda #>.op1
@@ -81,16 +85,16 @@ fail !scr "fail", 13, 0
 ; Test 1: add two single byte integers
 ;
 .a1=*
-!byte 5
+!byte 5, 0, 0, 0
 .a2=*
-!byte 52
+!byte 52, 0, 0, 0
 .l1 !scr "one: ", 0
 
 .run
     jsr subclearscreen
 
     +print_label .l1
-    +set_param 1, .a1, .a2
+    +set_param .a1, .a2
 
     jsr math_isequal
 
@@ -104,14 +108,14 @@ fail !scr "fail", 13, 0
 ;
 .b1=*
 !byte $05
-!byte $DE
+!byte $DE, $00, $00
 .b2=*
 !byte $06
-!byte $DE
+!byte $DE, $00, $00
 .l2 !scr "two: ", 0
 .test2
     +print_label .l2
-    +set_param 2, .b1, .b2
+    +set_param .b1, .b2
 
     jsr math_isequal
 
@@ -130,15 +134,11 @@ fail !scr "fail", 13, 0
 
 .test3
     +print_label .l3
-    +set_param 4, .c1, .c2
+    +set_param .c1, .c2
 
     jsr math_isequal
 
     +assert_equal
 
     rts           ; TODO add additional tests
-
-!source "../libs/preamble.a"
-!source "../libs/screen.a"
-!source "../libs/arithmetic.a"
 

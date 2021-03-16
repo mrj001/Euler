@@ -15,6 +15,9 @@
     !byte 0
 .basend !byte 0, 0
 
+mathprec=$04
+mathbcdprec=$05
+
 !source "../libs/arithmetic.a"
 
 ; This macro prints the label for the current test
@@ -24,20 +27,6 @@
     lda #>.lbl
     sta+1 straddr + 1 
     jsr subprint
-}
-
-; This macro sets the parameters for the math_isequal subroutine.
-!macro set_param_isequal .prec, .op1, .op2 {
-    lda #.prec         ; set precision to .prec
-    sta+1 mathprec
-    lda #<.op1         ; operand 1
-    sta+1 mathop1
-    lda #>.op1
-    sta+1 mathop1 + 1 
-    lda #<.op2         ; operand 2
-    sta+1 mathop2
-    lda #>.op2
-    sta+1 mathop2 + 1 
 }
 
 pass !scr "pass", 13, 0
@@ -53,19 +42,15 @@ fail !scr "fail", 13, 0
 ; Test 1: convert a single byte to BCD
 ;
 .a1=*
-!byte $2a
+!byte $2a, $00, $00, $00
 .expected1=*
-!byte $42, $00
+!byte $42, $00, $00, $00, $00
 .actual1=*
-!byte $00, $00
+!byte $00, $00, $00, $00, $00
 .l1 !scr "one: ",0
 
 test1
     +print_label .l1
-    lda #$01                             ; set precision
-    sta mathprec
-    lda #$02                             ; set BCD precision
-    sta mathbcdprec
     +set_param_bcd .a1, .actual1
 
     jsr math_bcd
@@ -99,19 +84,15 @@ test1
 ; Test 2: TODO
 ;
 .a2=*
-!byte $c1, $06
+!byte $c1, $06, $00, $00
 .expected2=*
-!byte $29, $17
+!byte $29, $17, $00, $00
 .actual2=*
-!byte $00, $00, $00
+!byte $00, $00, $00, $00, $00
 .l2 !scr "two: ",0
 
 test2
     +print_label .l2
-    lda #$02                             ; set precision
-    sta mathprec
-    lda #$03                             ; set BCD precision
-    sta mathbcdprec
     +set_param_bcd .a2, .actual2
 
     jsr math_bcd
@@ -155,10 +136,6 @@ test2
 
 test3
     +print_label .l3
-    lda #$04                             ; set precision
-    sta mathprec
-    lda #$05                             ; set BCD precision
-    sta mathbcdprec
     +set_param_bcd .a3, .actual3
 
     jsr math_bcd

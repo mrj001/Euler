@@ -26,7 +26,7 @@ overflow !scr "integer overflow", 13, 0
 ; If they are equal the Z flag will be set 
 ; after execution; otherwise the Z flag will be cleared.
 math_isequal:
-    lda+1 mathprec  ; load count of bytes per integer
+    lda+1 #mathprec ; load count of bytes per integer
     tay             ; y will index the bytes of each integer
     dey             ; y should be zero-based.
 .nextdigit
@@ -49,7 +49,7 @@ math_isequal:
 ;    mathop1: pointer to first integer to compare
 ;    mathop2: pointer to second integer to compare
 math_compare:
-    ldy mathprec    ; load count of bytes per integer
+    ldy #mathprec   ; load count of bytes per integer
     dey             ; index will be zero-based
     php             ; needed for correct stack usage
 .nextbyte:
@@ -90,7 +90,7 @@ math_compare:
 ;    mathop2: pointer to second addend
 ;    mathres: pointer to memory for the sum
 math_add:
-   ldx mathprec;
+   ldx #mathprec;
    clc
    ldy #$00        ; y will be index into the addends
 .nextdigit
@@ -127,7 +127,7 @@ math_add:
 ;    mathprec: number of bytes in each integer
 ;    mathop1:  pointer to the number to rotate
 math_rol:
-    ldx mathprec      ; x will be loop counter
+    ldx #mathprec     ; x will be loop counter
     ldy #$00          ; y is an index into the integer's bytes
     lda (mathop1), y  ; shift the least significant byte
     asl
@@ -177,7 +177,7 @@ math_bcd:
    dey
    bpl .zero_loop
 
-   ldy mathprec     ; number of bytes to convert
+   ldy #mathprec    ; number of bytes to convert
    ldx #$08         ; number of bits in a byte
 
 .byte_loop:

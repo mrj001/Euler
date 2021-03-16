@@ -15,6 +15,11 @@
     !byte 0
 .basend !byte 0, 0
 
+; define constants
+mathprec=$04
+mathbcdprec=$05
+
+!source "../libs/preamble.a"
 !source "../libs/arithmetic.a"
 
 ; This macro prints the label for the current test
@@ -24,20 +29,6 @@
     lda #>.lbl
     sta+1 straddr + 1 
     jsr subprint
-}
-
-; This macro sets the parameters for the math_isequal subroutine.
-!macro set_param_isequal .prec, .op1, .op2 {
-    lda #.prec         ; set precision to .prec
-    sta+1 mathprec
-    lda #<.op1         ; operand 1
-    sta+1 mathop1
-    lda #>.op1
-    sta+1 mathop1 + 1 
-    lda #<.op2         ; operand 2
-    sta+1 mathop2
-    lda #>.op2
-    sta+1 mathop2 + 1 
 }
 
 pass !scr "pass", 13, 0
@@ -89,24 +80,22 @@ fail !scr "fail", 13, 0
 ; Test 1: add 2 2-byte integers
 ;
 .a1=*
-!byte $2d, $45
+!byte $2d, $45, $00, $00
 .a2=*
-!byte $0e, $08
+!byte $0e, $08, $00, $00
 .expectedsum=*
-!byte $3b, $4d
+!byte $3b, $4d, $00, $00
 .actualsum=*
-!byte $00, $00
+!byte $00, $00, $00, $00
 .l1 !scr "one: ",0
 
 test1
     +print_label .l1
-    lda #$02                             ; set precision
-    sta mathprec
     +set_param_add .a1, .a2, .actualsum
 
     jsr math_add
 
-    +set_param_isequal 2, .expectedsum, .actualsum
+    +set_param_isequal .expectedsum, .actualsum
     jsr math_isequal
     +assert_equal;
 
@@ -127,13 +116,11 @@ test1
 
 test2
     +print_label .l2
-    lda #$04           ; set precision
-    sta mathprec
     +set_param_add .b1, .b2, .actualsum2
 
     jsr math_add
 
-    +set_param_isequal 4, .expectedsum2, .actualsum2
+    +set_param_isequal .expectedsum2, .actualsum2
     jsr math_isequal
     +assert_equal;
 
@@ -152,14 +139,9 @@ test2
 
 test3
     +print_label .l3
-    lda #$04           ; set precision
-    sta mathprec
     +set_param_add .c1, .c2, .actualsum3
 
     jsr math_add       ; overflow is expected
 
     rts
-
-!source "../libs/preamble.a"
-!source "../libs/screen.a"
 

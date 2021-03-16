@@ -15,6 +15,9 @@
     !byte 0
 .basend !byte 0, 0
 
+mathprec=$05
+mathbcdprec=$07
+
 !source "../libs/arithmetic.a"
 
 ; This macro prints the label for the current test
@@ -24,20 +27,6 @@
     lda #>.lbl
     sta+1 straddr + 1 
     jsr subprint
-}
-
-; This macro sets the parameters for the math_isequal subroutine.
-!macro set_param_isequal .prec, .op1, .op2 {
-    lda #.prec         ; set precision to .prec
-    sta+1 mathprec
-    lda #<.op1         ; operand 1
-    sta+1 mathop1
-    lda #>.op1
-    sta+1 mathop1 + 1 
-    lda #<.op2         ; operand 2
-    sta+1 mathop2
-    lda #>.op2
-    sta+1 mathop2 + 1 
 }
 
 pass !scr "pass", 13, 0
@@ -54,15 +43,13 @@ fail !scr "fail", 13, 0
 ;    significant bit clear
 ;
 .a1=*
-!byte $2d
+!byte $2d, $00, $00, $00, $00
 .expected1=*
-!byte $5a
+!byte $5a, $00, $00, $00, $00
 .l1 !scr "one: ",0
 
 test1
     +print_label .l1
-    lda #$01                             ; set precision
-    sta mathprec
     +set_param_rol .a1
 
     jsr math_rol
@@ -98,22 +85,20 @@ test1
 ;    most significant bit set
 ;
 .a2=*
-!byte $d2
+!byte $d2, $00, $00, $00, $00
 .expected2=*
-!byte $a4
+!byte $a4, $01, $00, $00, $00
 .actual2=*
-!byte $00, $00, $00
+!byte $00, $00, $00, $00, $00
 .l2 !scr "two: ",0
 
 test2
     +print_label .l2
-    lda #$01                  ; set precision
-    sta mathprec
     +set_param_rol .a2
 
     jsr math_rol
 
-    bcc .fail                 ; carry must be set
+    bcs .fail                 ; carry must be clear
 
     lda .a2
     cmp .expected2;
@@ -152,15 +137,13 @@ test2
 
 test3
     +print_label .l3
-    lda #$05                  ; set precision
-    sta mathprec
     +set_param_rol .a3
 
     jsr math_rol
 
     bcc .fail                 ; carry must be set
 
-    ldy mathprec              ; compare all bytes of result
+    ldy #mathprec             ; compare all bytes of result
     dey                       ; subtract one for index of last byte
 .compare_loop
     lda .a3, y
@@ -202,15 +185,13 @@ test3
 
 test4
     +print_label .l4
-    lda #$05                  ; set precision
-    sta mathprec
     +set_param_rol .a4
 
     jsr math_rol
 
     bcs .fail                 ; carry must be clear
 
-    ldy mathprec              ; compare all bytes of result
+    ldy #mathprec             ; compare all bytes of result
     dey                       ; subtract one for index of last byte
 .compare_loop
     lda .a4, y
