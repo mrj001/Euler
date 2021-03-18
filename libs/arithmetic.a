@@ -160,7 +160,7 @@ math_rol:
 ;
 ; Memory at the following labels is used as input
 ;    mathprec: number of bytes in each integer
-;    mathop1:  pointer to the number to rotate (destructive)
+;    mathop1:  pointer to the number to convert
 ;    mathres:  pointer to the memory to receive the result.
 ;
 ; Memory at the following labels is used internally:
