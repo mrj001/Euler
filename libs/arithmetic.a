@@ -276,5 +276,167 @@ math_multiply_byte:
    rts
 
 }  ; end of zone multiply_byte
+
+!zone multiply {
+!macro math_set_param_multiply .m1, .m2, .p {
+   lda #<.m1
+   sta mathop1
+   lda #>.m1
+   sta mathop1 + 1
+   lda #<.m2
+   sta mathop2
+   lda #>.m2
+   sta mathop2 + 1
+   lda #<.p
+   sta mathres
+   lda #>.p
+   sta mathres + 1
+}
+
+;
+; Multiplies two multi-byte integers
+; Much like multiplying two 32-bit integers in a higher-level
+; language, the result is required to fit in an integer of the
+; same size.
+;
+; Memory at the following labels is used as input
+;    mathop1: pointer to the multiplicand (Pointer will be altered.)
+;    mathop2: pointer to the multiplier (Pointer will be altered.)
+;    mathres:  pointer to the product
+;
+; memory for the number being multiplied
+.multiplicand=*
+!fill mathprec, 0
+; memory for the multiplier
+.multiplier=*
+!fill mathprec, 0
+.product=*
+!fill 2 * mathprec, 0
+.j=*
+!byte $00
+.k=*
+!byte $00
+
+math_multiply:
+;
+; Zero out the product
+;
+   lda #$00
+   ldy #2*mathprec
+   dey
+.initLoop1:
+   sta .product, y
+   dey
+   bpl .initLoop1
+
+; Make copies of the multiplicand and multiplier
+   ldy #mathprec
+   dey
+.initLoop2
+   lda (mathop1), y     ; copy multiplicand
+   sta .multiplicand, y
+   lda (mathop2), y     ; copy multiplier
+   sta .multiplier, y
+   dey
+   bpl .initLoop2
+
+;
+; For each byte of the multiplier (j)
+;
+   ldx #$00
+   stx .j
+.forj:
+   lda .multiplier, x
+   beq .nextj           ; if this byte is zero, this loop iteration can be skipped
+   tay                  ; y contains one of the arguments for math_multiply_byte
+
+;
+; For each byte of the multiplicand (k)
+;
+   ldx #$00
+   stx .k
+.fork:
+   lda .multiplicand, x
+   beq .nextk          ; if this byte is zero, this iteration can be skipped
+
+; Multiply the two bytes
+   jsr math_multiply_byte
+
+; The offset into .product is .j + .k
+   lda .j
+   clc
+   adc .k
+   bcs .overflow      ; If j + k is too big...
+   tax
+
+; Add the two-byte partial result from product_byte into .product
+   lda product_byte
+   adc .product, x
+   sta .product, x
+   inx
+   lda product_byte + 1
+   adc .product, x
+   sta .product, x
+
+.carry:
+   lda #$00           ; transfer Carry flag to Accumulator
+   adc #$00
+   beq .nextk         ; If no carry, "goto next k"
+
+   inx                ; Is it safe to store this carry?
+   cpx #mathprec
+   bpl .overflow      ; branch if NOT safe to store
+   adc .product, x
+   sta .product, x
+   bcs .carry
+
+; next multiplicand byte
+.nextk:
+   ldx .k
+   inx
+   stx .k
+   cpx #mathprec
+   bmi .fork
+
+; next multiplier byte
+.nextj:
+   ldx .j
+   inx
+   stx .j
+   cpx #mathprec
+   bmi .forj
+
+; check for overflow 
+; Integers are constrained to be all the same size
+; so the top half of .product must be all zero.
+   ldy #2 * mathprec
+   dey
+.overflowcheck:
+   lda .product, y
+   bne .overflow
+   dey
+   cpy #mathprec
+   bpl .overflowcheck
+
+; Copy the product to (mathres)
+   ldy #mathprec
+   dey
+.copyres:
+   lda .product, y
+   sta (mathres), y
+   dey
+   bpl .copyres
+
+   rts
+
+.overflow:
+   lda #<overflow
+   sta straddr
+   lda #>overflow
+   sta straddr + 1
+   jsr subprint
+   jmp $E37B       ; drop back to READY
+
+}   ; end of zone multiply
 }
 
