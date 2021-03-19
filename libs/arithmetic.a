@@ -26,6 +26,13 @@ overflow !scr "integer overflow", 13, 0
     sta mathop2 + 1
 }
 
+;
+; Constants
+;
+one=*
+!byte $01
+!fill mathprec - 1, $00
+
 ; Compares two integers for equality
 ; Memory at the following labels is used
 ;    mathprec: number of bytes in each integer
@@ -569,5 +576,72 @@ math_multiply:
    jmp $E37B       ; drop back to READY
 
 }   ; end of zone multiply
+
+!zone factorial {
+;
+; Calculates the factorial of the given number
+;
+; Memory at the following labels is used as input
+;    accumulator: The number for which factorial is to be calculated
+;    mathres:  pointer to the result
+;
+; Memory at the following labels is altered
+;    mathop1:
+;    mathop2:
+;
+
+; A loop counter for the numbers being multiplied
+.j=*
+!byte $00
+
+; upper limit for j loop
+.jul=*
+!byte $00
+
+.factor=*
+!fill mathprec, $00
+
+math_factorial:
+   sta .jul             ; save argument
+
+; fill (.factor), and (mathres) with one
+   ldy #mathprec - 1
+.initLoop:
+   lda one, y
+   sta .factor, y
+   sta (mathres), y
+   dey
+   bpl .initLoop
+
+; point mathop1 to .factor
+   lda #<.factor
+   sta mathop1
+   lda #>.factor
+   sta mathop1 + 1
+
+; copy mathres to mathop2
+   lda mathres
+   sta mathop2
+   lda mathres + 1
+   sta mathop2 + 1
+
+   lda #$01
+   sta .j
+   jmp .next
+.for:
++  ldy #$00              ; set (mathop1) to current factor being multiplied
+   sta (mathop1), y      ; the higher bytes of (mathop1) are always zero.
+
+   jsr math_multiply
+
+.next:
+   inc .j                ; increment loop counter
+   lda .j
+   cmp .jul              ; loop on (.j) <= (.jul)
+   bmi .for
+   beq .for
+   
+   rts
+}   ; end of zone factorial
 }
 

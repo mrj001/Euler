@@ -1,0 +1,157 @@
+;@com.wudsn.ide.asm.hardware=C64
+!to "TestFactorial.prg", cbm 
+!cpu 6510
+!sl "TestFactorial.labels"
+
+; BASIC program: (Where .run is replaced by its address.)
+;   10 SYS .run
+* = $0801
+    !byte <.basend,>.basend,$0A,$00,$9e
+    !byte .run/10000 + '0'    
+    !byte .run/1000 % 10 + '0'    
+    !byte .run/100 % 10 + '0'   
+    !byte .run/10 % 10 + '0' 
+    !byte .run % 10 + '0' 
+    !byte 0
+.basend !byte 0, 0
+
+mathprec=$05
+mathbcdprec=$07
+
+!source "../libs/preamble.a"
+!source "../libs/arithmetic.a"
+
+; This macro prints the label for the current test
+!macro print_label .lbl {
+    lda #<.lbl
+    sta+1 straddr
+    lda #>.lbl
+    sta+1 straddr + 1
+    jsr subprint
+}
+
+!macro assert_equal .expected, .actual {
+   lda #<.expected
+   sta mathop1
+   lda #>.expected
+   sta mathop1 + 1
+   lda #<.actual
+   sta mathop2
+   lda #>.actual
+   sta mathop2 + 1
+
+   ldy #mathprec
+   dey
+-  lda (mathop1), y
+   cmp (mathop2), y
+   bne .fail
+
+.pass
+    lda #<pass
+    sta straddr
+    lda #>pass
+    sta straddr + 1
+    jmp .result
+
+.fail
+    lda #<fail
+    sta straddr
+    lda #>fail
+    sta straddr + 1
+
+.result
+    jsr subprint
+}
+
+pass !scr "pass", 13, 0
+fail !scr "fail", 13, 0
+
+.run:
+   jmp test1
+
+!zone test1 {
+;
+; Test 1: 0! == 1
+;
+.expected
+!byte $01, $00, $00, $00, $00
+.actual
+!byte $00, $00, $00, $00, $00
+.lbl !scr "one: ", 0
+
+test1:
+    jsr subclearscreen
+
+    ; set up
+    +print_label .lbl
+    lda #<.actual
+    sta mathres
+    lda #>.actual
+    sta mathres + 1
+    lda #$00
+
+    ; action
+    jsr math_factorial
+
+    ; assert
+    +assert_equal .expected, .actual
+
+    jmp test2
+}
+
+!zone test2 {
+;
+; Test 2: 1! == 1
+;
+.expected
+!byte $01, $00, $00, $00, $00
+.actual
+!byte $00, $00, $00, $00, $00
+.lbl !scr "two: ", 0
+
+test2:
+    ; set up
+    +print_label .lbl
+    lda #<.actual
+    sta mathres
+    lda #>.actual
+    sta mathres + 1
+    lda #$01
+
+    ; action
+    jsr math_factorial
+
+    ; assert
+    +assert_equal .expected, .actual
+
+    jmp test3
+}
+
+!zone test3 {
+;
+; Test 3: 13! == 6,227,020,800
+;
+.expected
+!byte $00, $cc, $28, $73, $01
+.actual
+!byte $00, $00, $00, $00, $00
+.lbl !scr "three: ", 0
+
+test3:
+    ; set up
+    +print_label .lbl
+    lda #<.actual
+    sta mathres
+    lda #>.actual
+    sta mathres + 1
+    lda #$0d
+
+    ; action
+    jsr math_factorial
+
+    ; assert
+    +assert_equal .expected, .actual
+
+    rts
+}
+
