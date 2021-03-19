@@ -15,6 +15,9 @@
     !byte 0
 .basend !byte 0, 0
 
+mathprec=4
+mathbcdprec=5
+
 !source "../libs/preamble.a"
 !source "../libs/arithmetic.a"
 
