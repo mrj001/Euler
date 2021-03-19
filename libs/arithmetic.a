@@ -170,8 +170,7 @@ math_rol:
 
 math_bcd:
    lda #$00         ; zero out result area
-   ldy mathbcdprec
-   dey
+   ldy #mathbcdprec - 1
 .zero_loop
    sta (mathres), y
    dey
@@ -191,7 +190,7 @@ math_bcd:
    sei
    sed
    ldy #$00
-   ldx mathbcdprec
+   ldx #mathbcdprec
 .add_loop:
    lda (mathres), y
    adc (mathres), y
