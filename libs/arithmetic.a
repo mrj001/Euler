@@ -428,9 +428,12 @@ math_multiply_byte:
 ; same size.
 ;
 ; Memory at the following labels is used as input
-;    mathop1: pointer to the multiplicand (Pointer will be altered.)
-;    mathop2: pointer to the multiplier (Pointer will be altered.)
+;    mathop1: pointer to the multiplicand
+;             Neither the pointer nor its memory is altered.
+;    mathop2: pointer to the multiplier
+;             Neither the pointer nor its memory is altered.
 ;    mathres:  pointer to the product
+;              This memory returns the product.
 ;
 ; memory for the number being multiplied
 .multiplicand=*
