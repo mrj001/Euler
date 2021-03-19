@@ -1,0 +1,99 @@
+;@com.wudsn.ide.asm.hardware=C64
+!to "TestDigitSum.prg", cbm 
+!cpu 6510
+!sl "TestDigitSum.labels"
+
+; BASIC program: (Where .run is replaced by its address.)
+;   10 SYS .run
+* = $0801
+    !byte <.basend,>.basend,$0A,$00,$9e
+    !byte .run/10000 + '0'    
+    !byte .run/1000 % 10 + '0'    
+    !byte .run/100 % 10 + '0'   
+    !byte .run/10 % 10 + '0' 
+    !byte .run % 10 + '0' 
+    !byte 0
+.basend !byte 0, 0
+
+mathprec=$04
+mathbcdprec=$05
+
+!source "../libs/preamble.a"
+!source "../libs/arithmetic.a"
+
+; This macro prints the label for the current test
+!macro print_label .lbl {
+    lda #<.lbl
+    sta+1 straddr
+    lda #>.lbl
+    sta+1 straddr + 1
+    jsr subprint
+}
+
+!macro assert .expected, .actual {
+   lda #<.expected
+   sta mathop1
+   lda #>.expected
+   sta mathop1 + 1
+   lda #<.actual
+   sta mathop2
+   lda #>.actual
+   sta mathop2 + 1
+
+   ldy #mathprec
+   dey
+-  lda (mathop1), y
+   cmp (mathop2), y
+   bne .fail
+
+.pass
+    lda #<pass
+    sta straddr
+    lda #>pass
+    sta straddr + 1
+    jmp .result
+
+.fail
+    lda #<fail
+    sta straddr
+    lda #>fail
+    sta straddr + 1
+
+.result
+    jsr subprint
+}
+
+pass !scr "pass", 13, 0
+fail !scr "fail", 13, 0
+
+.run:
+   jmp test1
+
+!zone test1 {
+;
+; Test 1: Multiply 0 times a non-zero number
+;
+.m1=*
+!byte $80, $89, $05, $00
+.expected
+!byte $1b, $00, $00, $00
+.actual
+!byte $00, $00, $00, $00
+.lbl !scr "one: ", 0
+
+test1:
+    jsr subclearscreen
+
+    ; set up
+    +print_label .lbl
+    +math_set_param_digit_sum .m1, .actual
+
+    ; action
+    jsr math_digit_sum
+
+    ; assert
+    +assert .expected, .actual
+
+    rts
+}
+

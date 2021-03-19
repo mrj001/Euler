@@ -6,6 +6,15 @@
 !zone arithmetic {
 overflow !scr "integer overflow", 13, 0
 
+!macro overflow {
+   lda #<overflow
+   sta straddr
+   lda #>overflow
+   sta straddr + 1
+   jsr subprint
+   jmp $E37B       ; drop back to READY
+}
+
 !macro set_param_isequal .a, .b {
     lda #<.a
     sta mathop1
@@ -215,6 +224,126 @@ math_bcd:
 
    rts
 }  ; end of zone bcd
+
+!zone digit_sum {
+!macro math_set_param_digit_sum .op, .res {
+   lda #<.op
+   sta mathop1
+   lda #>.op
+   sta mathop1 + 1
+   lda #<.res
+   sta mathres
+   lda #>.res
+   sta mathres + 1
+}
+;
+; Sums all the digits in a number
+;
+; Memory at the following labels is used as input
+;    mathop1:  pointer to the number to sum
+;    mathres:  pointer to the memory to receive the result.
+;              This must be mathprec bytes.
+.intermediate=*
+!fill mathbcdprec, 0
+
+; two bytes at which to save the original value of mathres
+.tmpres=*
+!fill 2, 0
+
+math_digit_sum:
+; Zero out the memory at mathres
+   lda #$00
+   ldy #mathprec - 1
+.initLoop1:
+   sta (mathres), y
+   dey
+   bpl .initLoop1
+   
+; Save original value of mathres
+   lda mathres
+   sta .tmpres
+   lda mathres + 1
+   sta .tmpres + 1
+
+; point mathres at our intermediate result memory
+   lda #<.intermediate
+   sta mathres
+   lda #>.intermediate
+   sta mathres + 1
+
+; Zero out the space for the BCD number
+   ldy #mathbcdprec - 1
+.initLoop2:
+   sta .intermediate, y
+   dey
+   bpl .initLoop2
+
+; convert input at mathop1 to BCD in .intermediate
+   jsr math_bcd
+
+; restore original value of mathres
+   lda .tmpres
+   sta mathres
+   lda .tmpres + 1
+   sta mathres + 1
+
+; Add up the digits
+   ldx #mathbcdprec - 1
+.addhi:
+   lda .intermediate, x
+   lsr
+   lsr
+   lsr
+   lsr
+   clc
+   ldy #$00
+   adc (mathres), y
+   sta (mathres), y
+
+; handle carries for hi digit
+   bcc .addlo
+.carry1:
+   clc                  ; clear carry flag
+   lda #$01             ; Set Accumulator to 1 in lieu of Carry Flag
+   iny
+   cpy #mathprec        ; Is it safe to store?
+   beq .overflow
+   clc
+   adc (mathres), y     ; Add to result
+   sta (mathres), y
+   bcs .carry1
+
+.addlo
+   lda .intermediate, x
+   and #$0F
+   clc
+   ldy #$00
+   adc (mathres), y
+   sta (mathres), y
+
+; handle carries for lo digit
+   bcc .next
+.carry2:
+   clc                  ; clear carry flag
+   lda #$01             ; Set Accumulator to 1 in lieu of Carry Flag
+   iny
+   cpy #mathprec        ; Is it safe to store?
+   beq .overflow
+   clc
+   adc (mathres), y     ; Add to result
+   sta (mathres), y
+   bcs .carry2
+   
+; next byte
+.next
+   dex
+   bpl .addhi
+
+   rts
+
+.overflow
+   +overflow
+}
 
 !zone multiply_byte {
 ;
