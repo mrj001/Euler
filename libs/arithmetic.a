@@ -460,16 +460,14 @@ math_multiply:
 ; Zero out the product
 ;
    lda #$00
-   ldy #2*mathprec
-   dey
+   ldy #2*mathprec - 1
 .initLoop1:
    sta .product, y
    dey
    bpl .initLoop1
 
 ; Make copies of the multiplicand and multiplier
-   ldy #mathprec
-   dey
+   ldy #mathprec - 1
 .initLoop2
    lda (mathop1), y     ; copy multiplicand
    sta .multiplicand, y
@@ -557,8 +555,7 @@ math_multiply:
    bpl .overflowcheck
 
 ; Copy the product to (mathres)
-   ldy #mathprec
-   dey
+   ldy #mathprec - 1
 .copyres:
    lda .product, y
    sta (mathres), y
