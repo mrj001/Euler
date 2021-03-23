@@ -464,7 +464,8 @@ math_multiply:
 .initLoop1:
    sta .product, y
    dey
-   bpl .initLoop1
+   bne .initLoop1        ; can't use bpl as mathprec may be >64
+   sta .product, y       ; clear zero'th index
 
 ; Make copies of the multiplicand and multiplier
    ldy #mathprec - 1
