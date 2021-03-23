@@ -1,0 +1,95 @@
+;@com.wudsn.ide.asm.hardware=C64
+!to "Euler020.prg", cbm 
+!cpu 6510
+!sl "Euler020.labels"
+
+; BASIC program: (Where .run is replaced by its address.)
+;   10 SYS run
+* = $0801
+    !byte <.basend,>.basend,$0A,$00,$9e
+    !byte run/10000 + '0'    
+    !byte run/1000 % 10 + '0'    
+    !byte run/100 % 10 + '0'   
+    !byte run/10 % 10 + '0' 
+    !byte run % 10 + '0' 
+    !byte 0
+.basend !byte 0, 0
+
+mathprec=66
+mathbcdprec=79
+
+!source "preamble.a"
+!source "arithmetic.a"
+
+; This macro prints a string
+!macro print_label .lbl {
+    lda #<.lbl
+    sta+1 straddr
+    lda #>.lbl
+    sta+1 straddr + 1
+    jsr subprint
+}
+
+.data=*
+.lbl1 !scr "10:  ", 0
+.lbl2 !scr 13, "100: ", 0
+
+; storage for the factorial
+factorial=*
+!fill mathprec, 0
+
+; Storage for the answer
+answer=*
+!fill mathprec, 0
+
+; Storage for the BCD version of the answer
+bcd=*
+!fill mathbcdprec, 0
+
+run:
+   jsr subclearscreen
+
+; point mathres to factorial
+   lda #<factorial
+   sta mathres
+   lda #>factorial
+   sta mathres + 1
+
+; calculate 10!
+   lda #$0a
+   jsr math_factorial
+
+; calculate the Digit Sum of 10!
+   +math_set_param_digit_sum factorial, answer
+   jsr math_digit_sum
+
+; output the result for 10!:
+   +print_label .lbl1
+   +set_param_bcd answer, bcd
+   jsr math_bcd
+   +set_param_outputBCD bcd, mathbcdprec
+   jsr sub_outputBCD
+
+; point mathres to factorial
+   lda #<factorial
+   sta mathres
+   lda #>factorial
+   sta mathres + 1
+
+; calculate 100!
+   lda #$64
+   jsr math_factorial
+
+; calculate the Digit Sum of 100!
+   +math_set_param_digit_sum factorial, answer
+   jsr math_digit_sum
+
+; output the result for 100!:
+   +print_label .lbl2
+   +set_param_bcd answer, bcd
+   jsr math_bcd
+   +set_param_outputBCD bcd, mathbcdprec
+   jsr sub_outputBCD
+
+   rts
+
