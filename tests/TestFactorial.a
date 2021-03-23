@@ -45,6 +45,8 @@ mathbcdprec=$07
 -  lda (mathop1), y
    cmp (mathop2), y
    bne .fail
+   dey
+   bpl -
 
 .pass
     lda #<pass
