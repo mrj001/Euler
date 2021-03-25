@@ -1,0 +1,90 @@
+;
+; Routines related to the Collatz series
+; Note: include arithmetic.a before this file.
+;
+
+;
+; This subroutine calculates the next Collatz number.
+;
+; Inputs:
+;   mathop1: pointer to the current number
+;      This memory will be updated to the result value
+;   mathprec: specifies the number of bytes in an integer
+;
+; Side Effects:
+;   mathop2, mathres: these pointers will be altered
+;
+.tmp=*
+!fill mathprec, 0
+
+.tmpptr=*
+!fill 2, 0
+
+collatz_next:
+; Is the number even?
+   lda #$01
+   ldy #$00
+   and (mathop1), y
+   bne .odd
+
+.even:
+; divide by 2
+; mathop1 already contains the number to rotate
+   jsr math_ror
+   rts
+
+.odd:
+; n -> 3n + 1
+
+; point mathop2 and mathres to .tmp
+   lda #<.tmp
+   sta mathop2
+   sta mathres
+   lda #>.tmp
+   sta mathop2 + 1
+   sta mathres + 1
+
+; copy the number to .tmp 
+   ldy #mathprec-1
+.copy:
+   lda (mathop1), y
+   sta .tmp, y
+   dey
+   bpl .copy
+
+; rotate the input to the left
+; so mathop1 points to 2n
+   jsr math_rol
+
+; add n + 2n to get 3n in (mathres)
+   jsr math_add
+   
+; change mathop1 to point to the "one" constant
+   lda mathop1
+   sta .tmpptr
+   lda mathop1 + 1
+   sta .tmpptr + 1
+   lda #<one
+   sta mathop1
+   lda #>one
+   sta mathop1 + 1
+
+; add 1 to 3n
+   jsr math_add
+
+; restore mathop1
+   lda #<.tmp
+   sta mathop1
+   lda #>.tmp
+   sta mathop1 + 1
+
+; copy result from mathres (equal to .tmp) to mathop1
+   ldy #mathprec - 1
+.copy2:
+   lda .tmp, y
+   sta (mathop1), y
+   dey
+   bpl .copy2
+
+   rts
+
