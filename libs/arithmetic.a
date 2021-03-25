@@ -160,6 +160,34 @@ math_rol:
     rts
 }  ; end of zone rotate_left
 
+!zone rotate_right {
+; This macro sets the parameter for the rotate right subroutine.
+!macro math_set_param_ror .a {
+   lda #<.a
+   sta mathop1
+   lda #>.a
+   sta mathop1 + 1
+}
+
+; Rotate an unsigned integer one bit to the right
+; On return, the carry flag will contain the lease
+; significant bit of the integer.
+; Memory at the following labels is used
+;    mathprec: number of bytes in each integer
+;    mathop1:  pointer to the number to rotate
+math_ror:
+   ldy #mathprec - 1   ; init loop counter
+   clc
+.loop:
+   lda (mathop1), y
+   ror
+   sta (mathop1), y
+   dey
+   bpl .loop
+
+   rts
+}   ; end of zone rotate_right
+
 !zone bcd {
 !macro set_param_bcd .a, .res {
    lda #<.a          ; set up pointer to binary input
