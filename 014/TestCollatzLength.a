@@ -18,7 +18,7 @@
 mathprec=$03
 mathbcdprec=$04
 
-!source "../libs/arithmetic.a"
+!source "arithmetic.a"
 !source "Collatz.a"
 
 ; This macro prints the label for the current test
