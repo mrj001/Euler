@@ -145,6 +145,47 @@ test2
 
     +assert_equal .expected, .actual
 
+    jmp test3
+}
+
+!zone test2 {
+;
+; Test 3: generate the next value for a second odd number
+;
+.a2=*
+!byte $05
+!fill mathprec - 1, $00
+
+.expected=*
+!byte $10
+!fill mathprec - 1, $00
+
+.actual=*
+!fill mathprec, $00
+
+.lbl !scr "three: ",0
+
+test3
+    +print_label .lbl
+
+; copy input to actual
+    ldy #mathprec - 1
+.for1:
+    lda .a2, y
+    sta .actual, y
+    dey
+    bpl .for1
+
+; point mathop1 at actual
+    lda #<.actual
+    sta mathop1
+    lda #>.actual
+    sta mathop1 + 1
+
+    jsr collatz_next
+
+    +assert_equal .expected, .actual
+
     rts
 }
 

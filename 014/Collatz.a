@@ -73,9 +73,9 @@ collatz_next:
    jsr math_add
 
 ; restore mathop1
-   lda #<.tmp
+   lda .tmpptr
    sta mathop1
-   lda #>.tmp
+   lda .tmpptr + 1
    sta mathop1 + 1
 
 ; copy result from mathres (equal to .tmp) to mathop1
@@ -87,4 +87,54 @@ collatz_next:
    bpl .copy2
 
    rts
+
+;
+; This subroutine calculates the length of the
+; Collatz Sequence for the number in (mathop1).
+;
+; Inputs:
+;   mathop1: pointer to the number for which to calculate
+;      the chain length.
+; 
+; Outputs:
+;   mathres: the low order byte will return the chain length
+;
+; Side Effects:
+;   mathop2 is altered
+;
+.length=*
+!byte $00
+
+collatz_length:
+; reset result to zero
+   lda #$01
+   sta .length
+
+.count_loop:
+; point mathop2 to "one" constant
+   lda #<one
+   sta mathop2
+   lda #>one
+   sta mathop2 + 1
+
+; Compare (mathop1) to "one"
+   jsr math_compare
+   beq .done_count
+
+; calculate the next Collatz number
+   jsr collatz_next
+
+; increment the length
+   inc .length
+   beq .overflow          ; branch if overflowed to zero
+   bne .count_loop
+
+.done_count:
+; copy .length to mathres
+   lda .length
+   sta mathres
+   rts
+
+.overflow:
+   +overflow
 
