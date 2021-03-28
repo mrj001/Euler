@@ -198,5 +198,38 @@ sub_outputBCD:
    rts
     
 }  ; end zone outputBCD
+
+!zone outputinteger {
+!macro screen_set_param_outputinteger ptr {
+   lda #<ptr
+   sta mathop1
+   lda #>ptr
+   sta mathop1 + 1
+}
+
+;
+; This subroutine outputs an unsigned integer
+;
+; Inputs:
+;  mathop1: pointer to the number to output
+;  mathprec: number of bytes in the number
+;
+;
+; memory to receive the BCD version of the number
+.bcdnum=*
+!fill mathbcdprec, $00
+
+screen_outputinteger:
+   lda #<.bcdnum         ; point mathres at our bcd number
+   sta mathres
+   lda #>.bcdnum
+   sta mathres + 1
+
+   jsr math_bcd          ; convert the number to BCD
+
+   jsr sub_outputBCD     ; output the number to the screen
+
+   rts
+}  ; end zone outputinteger
 }  ; end zone screen
 

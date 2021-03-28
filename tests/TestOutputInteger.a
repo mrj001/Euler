@@ -1,0 +1,95 @@
+;@com.wudsn.ide.asm.hardware=C64
+!to "TestOutputInteger.prg", cbm 
+!cpu 6510
+!sl "TestOutputInteger.labels"
+
+; BASIC program: (Where .run is replaced by its address.)
+;   10 SYS .run
+* = $0801
+    !byte <.basend,>.basend,$0A,$00,$9e
+    !byte .run/10000 + '0'    
+    !byte .run/1000 % 10 + '0'    
+    !byte .run/100 % 10 + '0'   
+    !byte .run/10 % 10 + '0' 
+    !byte .run % 10 + '0' 
+    !byte 0
+.basend !byte 0, 0
+
+mathprec=$04
+mathbcdprec=$05
+
+!source "../libs/arithmetic.a"
+; !source "../libs/screen.a"
+
+; This macro prints the label for the current test
+!macro print_label .lbl {
+    lda #<.lbl
+    sta+1 straddr
+    lda #>.lbl
+    sta+1 straddr + 1 
+    jsr subprint
+}
+
+; Clear screen before running tests
+.run
+    jsr subclearscreen
+    jmp test1
+
+!zone test1 {
+;
+; Test 1: output a single byte integer
+;
+.a1=*
+!byte $2a, $00, $00, $00
+
+.lbl !scr "one: ",13, "expected: 42", 13, "actual:   ", 0
+
+test1
+    +print_label .lbl
+    +screen_set_param_outputinteger .a1
+
+    jsr screen_outputinteger
+
+    ; results to be checked visually by user.
+    jmp test2
+}
+
+!zone test2 {
+;
+; Test 2: output a 2-byte integer
+;
+.a2=*
+!byte $c1, $06, $00, $00
+
+.lbl !scr 13, "two: ",13, "expected: 1729", 13, "actual:   ", 0
+
+test2
+    +print_label .lbl
+    +screen_set_param_outputinteger .a2
+
+    jsr screen_outputinteger
+
+    ; results to be checked visually by user.
+    jmp test3
+}
+
+
+!zone test3 {
+;
+; Test 3: output a 4-byte integer
+;
+.a3=*
+!byte $11, $07, $2b, $2e
+
+.lbl !scr 13, "three: ", 13, "expected: 774571793", 13, "actual:   ", 0
+
+test3
+    +print_label .lbl
+    +screen_set_param_outputinteger .a3
+
+    jsr screen_outputinteger
+
+    ; results to be checked visually by user.
+    rts
+}
+

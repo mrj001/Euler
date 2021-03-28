@@ -1,0 +1,102 @@
+;@com.wudsn.ide.asm.hardware=C64
+!to "Euler014.prg", cbm 
+!cpu 6510
+!sl "Euler014.labels"
+
+; BASIC program: (Where .run is replaced by its address.)
+;   10 SYS .run
+* = $0801
+    !byte <.basend,>.basend,$0A,$00,$9e
+    !byte .run/10000 + '0'    
+    !byte .run/1000 % 10 + '0'    
+    !byte .run/100 % 10 + '0'   
+    !byte .run/10 % 10 + '0' 
+    !byte .run % 10 + '0' 
+    !byte 0
+.basend !byte 0, 0
+
+mathprec=$03
+mathbcdprec=$04
+
+!source "arithmetic.a"
+!source "Collatz.a"
+
+; Clear screen before running
+.run
+    jsr subclearscreen
+    jmp euler014
+
+; upper limit (not inclusive) of loop
+onemillion=*
+!byte $40, $42, $0f
+
+; The length of the currently longest chain.
+longestchainlength=*
+!byte $00
+
+; The starting number of the currently longest
+; chain.
+longeststartingnumber=*
+!fill mathprec, 0
+
+; Current starting number being checked (loop index)
+j=*
+!fill mathprec, 0
+
+euler014:
+; j = 2
+   lda #$02
+   sta j
+
+.forj:
+; calculate the chain length
+   lda #<j              ; set pointer to j
+   sta mathop1
+   lda #>j
+   sta mathop1 + 1
+
+   jsr collatz_length   ; calculate the chain length
+
+; Is the result > longestchainlength?
+   lda mathres
+   cmp longestchainlength
+   beq .nextj
+   bmi .nextj
+
+; copy current values to the longest ones
+   sta longestchainlength
+   ldy #mathprec - 1
+.copyloop:
+   lda j, y
+   sta longeststartingnumber, y
+   dey
+   bne .copyloop
+
+.nextj:
+   ldx #$00
+.incrementj
+   inc j, x
+   bne .testj
+   inx
+   cpx #mathprec
+   beq .overflow
+   bmi .incrementj
+.testj:
+   lda #<j
+   sta mathop1
+   lda #>j
+   sta mathop1 + 1
+   lda #<onemillion
+   sta mathop2
+   lda #>onemillion
+   sta mathop2 + 1
+   jsr math_compare
+   bmi .forj
+
+; output result
+
+
+   rts
+
+.overflow
+   +overflow
