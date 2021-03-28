@@ -134,7 +134,6 @@ subprintonechar:
    ldy #>.ptr
    sty mathres + 1
    ldy #.bcdprec
-   ; sty mathbcdprec
 }
 
 ; outputs a BCD number, with leading zeroes suppressed
@@ -150,8 +149,7 @@ subprintonechar:
 !byte $00
 
 sub_outputBCD:
-    ; ldy mathbcdprec     ; load y with number of bytes
-    dey                 ; y is zero-based index.
+    ldy #mathbcdprec - 1; load y with zero-based index of last byte
     lda #$00            ; suppress leading zeroes
     sta .zero_suppress
 
