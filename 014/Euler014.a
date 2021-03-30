@@ -21,6 +21,10 @@ mathbcdprec=$04
 !source "arithmetic.a"
 !source "Collatz.a"
 
+; strings
+strlongest !scr "longest chain: ", 0
+strstartvalue !scr "starting value: ", 0
+
 ; Clear screen before running
 .run
     jsr subclearscreen
@@ -43,19 +47,31 @@ longeststartingnumber=*
 j=*
 !fill mathprec, 0
 
+; Argument to pass to the Collatz Length subroutine
+collatzarg=*
+!fill mathprec, 0
+
 euler014:
 ; j = 2
    lda #$02
    sta j
 
 .forj:
+; Copy j to collatzarg
+   ldy #mathprec - 1
+.copyj:
+   lda j, y
+   sta collatzarg, y
+   dey
+   bpl .copyj
+
 ; calculate the chain length
-   lda #<j              ; set pointer to j
+   lda #<collatzarg        ; point mathop1 to collatzarg
    sta mathop1
-   lda #>j
+   lda #>collatzarg
    sta mathop1 + 1
 
-   jsr collatz_length   ; calculate the chain length
+   jsr collatz_length      ; calculate the chain length
 
 ; Is the result > longestchainlength?
    lda mathres
@@ -67,7 +83,7 @@ euler014:
    sta longestchainlength
    ldy #mathprec - 1
 .copyloop:
-   lda j, y
+   lda collatzarg, y
    sta longeststartingnumber, y
    dey
    bne .copyloop
@@ -76,27 +92,47 @@ euler014:
    ldx #$00
 .incrementj
    inc j, x
-   bne .testj
-   inx
-   cpx #mathprec
-   beq .overflow
+   bne .testj           ; branch if no carry to the next byte
+   inx                  ; advance to next byte of j
+   cpx #mathprec        ; Check for overflow
+   beq .overflow2
    bmi .incrementj
 .testj:
-   lda #<j
+   lda #<j              ; set mathop1 to point to j
    sta mathop1
    lda #>j
    sta mathop1 + 1
-   lda #<onemillion
+   lda #<onemillion     ; set mathop2 to point to onemillion
    sta mathop2
    lda #>onemillion
    sta mathop2 + 1
-   jsr math_compare
-   bmi .forj
+   jsr math_compare     ; compare j to onemillion
+   bmi .forj            ; loop if j < 1,000,000
 
+;
 ; output result
+;
+   lda #<strlongest     ; point straddr to the longest chain string
+   sta straddr
+   lda #>strlongest
+   sta straddr + 1
+   jsr subprint         ; print it
+  
+   ; print the longest chain length
+   +screen_set_param_outputinteger longestchainlength
+   jsr screen_outputinteger
 
+   lda #<strstartvalue  ; point str addr to the starting value string
+   sta straddr
+   lda #>strstartvalue
+   sta straddr + 1
+   jsr subprint         ; print it
+
+   ; print the starting value
+   +screen_set_param_outputinteger longeststartingnumber
+   jsr screen_outputinteger
 
    rts
 
-.overflow
+.overflow2
    +overflow
