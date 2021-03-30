@@ -33,12 +33,18 @@ mathbcdprec=$04
 pass !scr "pass", 13, 0
 fail !scr "fail", 13, 0
 
-; This macro asserts that the single-byte integers
+; This macro asserts that the multi-byte integers
 ; pointed to by the parameters are equal.
+;   .expected: address of expected value
+;   .actual: address of the actual value
 !macro assert_equal .expected, .actual {
-    lda .expected
-    cmp .actual
+    ldy #mathprec - 1
+.compare:
+    lda .expected, y
+    cmp .actual, y
     bne .fail
+    dey
+    bpl .compare
 
 .pass:
     lda #<pass
@@ -87,7 +93,7 @@ test1
 
     jsr collatz_length
 
-    +assert_equal .expected, mathres
+    +assert_equal .expected, collatz_length_result
 
     rts
 }

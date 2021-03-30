@@ -97,18 +97,24 @@ collatz_next:
 ;      the chain length.
 ; 
 ; Outputs:
-;   mathres: the low order byte will return the chain length
+;   collatz_length_result: will contain the chain length
 ;
 ; Side Effects:
 ;   mathop2 is altered
 ;
-.length=*
-!byte $00
+collatz_length_result=*
+!fill mathprec, $00
 
 collatz_length:
-; reset result to zero
+; initialize result to one
+   ldx #mathprec - 1
+   lda #$00
+.init_loop:
+   sta collatz_length_result, x
+   dex
+   bne .init_loop
    lda #$01
-   sta .length
+   sta collatz_length_result
 
 .count_loop:
 ; point mathop2 to "one" constant
@@ -125,14 +131,17 @@ collatz_length:
    jsr collatz_next
 
 ; increment the length
-   inc .length
-   beq .overflow          ; branch if overflowed to zero
-   bne .count_loop
+   ldx #$00
+.increment:
+   inc collatz_length_result, x
+   bne .count_loop      ; branch if no carry to the next byte
+   inx                  ; advance to next byte of collatz_length_result
+   cpx #mathprec        ; Check for overflow
+   beq .overflow        ; MSB rolled over to zero means overflow
+   bmi .increment
+   jmp .count_loop
 
 .done_count:
-; copy .length to mathres
-   lda .length
-   sta mathres
    rts
 
 .overflow:
