@@ -36,7 +36,7 @@ onemillion=*
 
 ; The length of the currently longest chain.
 longestchainlength=*
-!byte $00
+!fill mathprec, $00
 
 ; The starting number of the currently longest
 ; chain.
@@ -74,17 +74,24 @@ euler014:
    jsr collatz_length      ; calculate the chain length
 
 ; Is the result > longestchainlength?
-   lda mathres
-   cmp longestchainlength
-   beq .nextj
-   bmi .nextj
+   lda #<collatz_length_result   ; point mathop1 to collatz_length_result
+   sta mathop1
+   lda #>collatz_length_result
+   sta mathop1 + 1
+   lda #<longestchainlength      ; point mathop2 to longestchainlength
+   sta mathop2
+   lda #>longestchainlength
+   sta mathop2 + 1
+   jsr math_compare
+   bmi .nextj                    ; if (mathop1) < (mathop2) goto .nextj
 
-; copy current values to the longest ones
-   sta longestchainlength
+; Copy the current values to the longest ones.
    ldy #mathprec - 1
 .copyloop:
-   lda collatzarg, y
+   lda j, y
    sta longeststartingnumber, y
+   lda collatz_length_result, y
+   sta longestchainlength, y
    dey
    bne .copyloop
 
