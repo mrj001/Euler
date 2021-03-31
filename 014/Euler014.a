@@ -23,7 +23,7 @@ mathbcdprec=$07
 
 ; strings
 strlongest !scr "longest chain: ", 0
-strstartvalue !scr "starting value: ", 0
+strstartvalue !scr 13, "starting value: ", 0
 
 ; Clear screen before running
 .run
