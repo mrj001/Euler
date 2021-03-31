@@ -15,8 +15,8 @@
     !byte 0
 .basend !byte 0, 0
 
-mathprec=$03
-mathbcdprec=$04
+mathprec=$05
+mathbcdprec=$07
 
 !source "arithmetic.a"
 !source "Collatz.a"
