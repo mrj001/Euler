@@ -93,7 +93,7 @@ euler014:
    lda collatz_length_result, y
    sta longestchainlength, y
    dey
-   bne .copyloop
+   bpl .copyloop
 
 .nextj:
    ldx #$00
