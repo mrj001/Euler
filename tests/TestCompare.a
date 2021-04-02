@@ -284,6 +284,49 @@ test5:
 .result
     jsr subprint
 
-    rts
+    jmp test6
 }
+
+!zone test6 {
+;
+; Test 5: Compare 314 and 1,000,000 to confirm that it is less than.
+;   op1 < op2
+;
+.a1=*
+!byte $3a, $01, $00, $00, $00
+.a2=*
+!byte $40, $42, $0f, $00, $00
+.expected=$01  ; N & Z clear; C set
+.lbl !scr "six: ", 0
+
+test6:
+    ; set up
+    +print_label .lbl
+    +set_param .a1, .a2
+
+    ; action
+    jsr math_compare
+
+    ; assert 314 < 1,000,000
+    bmi .pass
+
+.fail
+    lda #<fail
+    sta straddr
+    lda #>fail
+    sta straddr + 1
+    jmp .result
+
+.pass
+    lda #<pass
+    sta straddr
+    lda #>pass
+    sta straddr + 1
+
+.result
+    jsr subprint
+
+    rts
+}  ; end zone test6
+
 
