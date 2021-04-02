@@ -33,6 +33,7 @@ strstartvalue !scr 13, "starting value: ", 0
 ; upper limit (not inclusive) of loop
 onemillion=*
 !byte $40, $42, $0f
+!fill mathprec - 3, $00
 
 ; The length of the currently longest chain.
 longestchainlength=*
