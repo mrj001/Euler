@@ -1,0 +1,156 @@
+;@com.wudsn.ide.asm.hardware=C64
+!to "TestBitVector.prg", cbm 
+!cpu 6510
+!sl "TestBitVector.labels"
+
+; BASIC program: (Where .run is replaced by its address.)
+;   10 SYS .run
+* = $0801
+    !byte <.basend,>.basend,$0A,$00,$9e
+    !byte .run/10000 + '0'    
+    !byte .run/1000 % 10 + '0'    
+    !byte .run/100 % 10 + '0'   
+    !byte .run/10 % 10 + '0' 
+    !byte .run % 10 + '0' 
+    !byte 0
+.basend !byte 0, 0
+
+mathprec=$04
+mathbcdprec=$05
+
+; Tell bitvector.a that we are testing.
+__TEST_BITVECTOR=$01
+
+!source "../libs/preamble.a"
+!source "../libs/screen.a"
+!source "../libs/bitvector.a"
+
+; This macro prints the label for the current test
+!macro print_string .lbl {
+    lda #<.lbl
+    sta+1 straddr
+    lda #>.lbl
+    sta+1 straddr + 1
+    jsr subprint
+}
+
+pass !scr "pass", 13, 0
+fail !scr "fail", 13, 0
+
+;
+; Begin test execution here
+;
+.run:
+   jsr subclearscreen
+   jmp test1
+
+!zone test1 {
+;
+; Test 1: Clear the Bit Vector
+;  
+.lbl !scr "one:", 0
+
+test1:
+   +print_string .lbl
+
+   jsr bitvector_clear
+
+; Confirm lo sentinel is unaltered
+   lda bitvector_sentinel_lo
+   cmp #$ba
+   bne .fail
+
+; Confirm byte after lo sentinal is zero
+   lda bitvector_sentinel_lo + 1
+   bne .fail
+
+; Confirm hi sentinel is unaltered
+   lda bitvector_sentinel_hi
+   cmp #$ad
+   bne .fail
+
+; Confirm byte before hi sentinal is zero
+   lda bitvector_sentinel_hi - 1
+   bne .fail
+
+; Confirm a byte in the middle is zero
+   lda (bitvector_sentinel_hi + bitvector_sentinel_lo) / 2
+   bne .fail
+
+   +print_string pass
+   jmp test2
+
+.fail:
+   +print_string fail
+
+   jmp test2
+} ; end of zone test1
+
+!zone test2 {
+;
+; Test 2: Confirm Set, Get, and Clear of various bits.
+;
+.lbl !scr "two:", 0
+
+test2:
+   +print_string .lbl
+
+   lda #$00               ; set the bit at index 0
+   ldy #$00
+   jsr bitvector_setbit
+
+; confirm that bit 0 is set
+   lda #$00
+   ldy #$00
+   jsr bitvector_getbit
+   beq .fail              ; Test fails if the bit is clear
+
+; confirm that bit 1 is clear
+   lda #$01
+   ldy #$00
+   jsr bitvector_getbit
+   bne .fail              ; Test fails if the bit is set
+
+; clear bit 0
+   lda #$00
+   ldy #$00
+   jsr bitvector_clearbit
+
+; confirm that bit 0 is clear
+   lda #$00
+   ldy #$00
+   jsr bitvector_getbit
+   bne .fail              ; Test fails if the bit is set
+
+; set bit 513 (a bit inside a byte)
+   lda #$01
+   ldy #$02
+   jsr bitvector_setbit
+
+; Confirm bit 512 is clear
+   lda #$00
+   ldy #$02
+   jsr bitvector_getbit
+   bne .fail              ; Test fails if bit 512 is set
+
+; Confirm bit 514 is clear
+   lda #$02
+   ldy #$02
+   jsr bitvector_getbit
+   bne .fail              ; Test fails if bit 514 is set
+
+; Confirm bit 513 is set
+   lda #$01
+   ldy #$02
+   jsr bitvector_getbit
+   beq .fail              ; Test fails if bit 512 is clear
+
+.pass
+   +print_string pass
+   rts
+
+.fail
+   +print_string fail
+
+   rts
+}   ; end of zone test2

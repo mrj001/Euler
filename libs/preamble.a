@@ -1,6 +1,8 @@
 ;
 ; Zero Page Memory map
 ;
+!ifndef __PREAMBLE {
+__PREAMBLE = $01
 
 ; two bytes to use for a temporary address
 tmpaddr = $02
@@ -31,4 +33,5 @@ mathres = $0B   ; pointer to result
 ;  66        79
 ; You must define mathbcdprec prior to including other source files
 ; mathbcdprec = $4f
+}
 
