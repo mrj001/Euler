@@ -1,7 +1,5 @@
 ; Bit Vector routines
 
-!source "../libs/preamble.a"
-
 !zone bitvector {
 bitvector_length=1000
 

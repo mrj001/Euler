@@ -1,7 +1,6 @@
 ; Arithmetic routines
 
-!source "../libs/preamble.a"
-!source "../libs/screen.a"
+; Include preamble.a and screen.a before this file
 
 !zone arithmetic {
 overflow !scr "integer overflow", 13, 0
