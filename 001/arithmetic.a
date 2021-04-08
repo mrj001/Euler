@@ -1,0 +1,672 @@
+; Arithmetic routines
+
+; Include preamble.a and screen.a before this file
+
+!zone arithmetic {
+overflow !scr "integer overflow", 13, 0
+
+!macro overflow {
+   lda #<overflow
+   sta straddr
+   lda #>overflow
+   sta straddr + 1
+   jsr subprint
+   jmp $E37B       ; drop back to READY
+}
+
+!macro set_param_isequal .a, .b {
+    lda #<.a
+    sta mathop1
+    lda #>.a
+    sta mathop1 + 1
+    lda #<.b
+    sta mathop2
+    lda #>.b
+    sta mathop2 + 1
+}
+
+;
+; Constants
+;
+one=*
+!byte $01
+!fill mathprec - 1, $00
+
+; Compares two integers for equality
+; Memory at the following labels is used
+;    mathprec: number of bytes in each integer
+;    mathop1: pointer to first integer to compare
+;    mathop2: pointer to second integer to compare
+;
+; If they are equal the Z flag will be set 
+; after execution; otherwise the Z flag will be cleared.
+math_isequal:
+    lda+1 #mathprec ; load count of bytes per integer
+    tay             ; y will index the bytes of each integer
+    dey             ; y should be zero-based.
+.nextdigit
+    lda (mathop1), y
+    cmp (mathop2), y
+    bne .end        ; not equal; return with Z flag cleared
+    dey             ; will set/clear Z flag.
+    bpl .nextdigit
+    lda #$00        ; set Z flag
+.end 
+    rts
+
+!zone compare {
+; Set flags N, Z & C as though a subtraction of a multi-byte integer
+; had been done.  (i.e. op1 - op2).  Unlike an actual subtraction,
+; the V flag is not affected.
+; This is analogous to a CMP, but for multiple bytes.
+; Memory at the following labels is used
+;    mathprec: number of bytes in each integer
+;    mathop1: pointer to first integer to compare
+;    mathop2: pointer to second integer to compare
+math_compare:
+    ldy #mathprec   ; load count of bytes per integer
+    dey             ; index will be zero-based
+    php             ; needed for correct stack usage
+.nextbyte:
+    plp             ; offset push of flags at end of loop
+    lda (mathop1), y
+    cmp (mathop2), y
+    bne .end        ; not equal - flags are set
+    php             ; preserve flags
+    dey             ; will alter N & Z flags
+    bpl .nextbyte
+    plp             ; restore flags from last byte comparison
+.end
+    rts
+}
+
+
+!zone add {
+; This macro sets parameters for the math_add subroutine.
+!macro set_param_add .a1, .a2, .sum {
+   lda #<.a1         ; copy pointer for first addend
+   sta mathop1
+   lda #>.a1
+   sta mathop1 + 1
+   lda #<.a2         ; copy pointer for second addend
+   sta mathop2
+   lda #>.a2
+   sta mathop2 + 1
+   lda #<.sum        ; copy pointer for sum
+   sta mathres
+   lda #>.sum
+   sta mathres + 1
+}
+
+; Add two unsigned integers
+; Memory at the following labels is used
+;    mathprec: number of bytes in each integer
+;    mathop1: pointer to first addend
+;    mathop2: pointer to second addend
+;    mathres: pointer to memory for the sum
+math_add:
+   ldx #mathprec;
+   clc
+   ldy #$00        ; y will be index into the addends
+.nextdigit
+   lda (mathop1), y  ; load byte of first addend
+   adc (mathop2), y  ; add byte of second addend
+   sta (mathres), y  ; store byte of sum
+   iny
+   dex
+   bne .nextdigit
+   bcs .error
+   rts
+.error
+   lda #<overflow
+   sta straddr
+   lda #>overflow
+   sta straddr + 1
+   jsr subprint
+   jmp $E37B       ; drop back to READY
+}  ; end of zone add
+
+!zone rotate_left {
+; This macro sets parameters for the rotate left subroutine
+!macro set_param_rol .a {
+   lda #<.a
+   sta mathop1
+   lda #>.a
+   sta mathop1 + 1
+}
+
+; Rotate an unsigned integer one bit to the left
+; On return, the carry flag will contain the most 
+; significant bit of the integer.
+; Memory at the following labels is used
+;    mathprec: number of bytes in each integer
+;    mathop1:  pointer to the number to rotate
+math_rol:
+    ldx #mathprec     ; x will be loop counter
+    ldy #$00          ; y is an index into the integer's bytes
+    lda (mathop1), y  ; shift the least significant byte
+    asl
+    sta (mathop1), y
+.loop
+    dex               ; check for end of loop
+    beq .end
+    iny               ; next byte
+    lda (mathop1), y  ; shift a byte
+    rol
+    sta (mathop1), y
+    jmp .loop
+.end
+    rts
+}  ; end of zone rotate_left
+
+!zone rotate_right {
+; This macro sets the parameter for the rotate right subroutine.
+!macro math_set_param_ror .a {
+   lda #<.a
+   sta mathop1
+   lda #>.a
+   sta mathop1 + 1
+}
+
+; Rotate an unsigned integer one bit to the right
+; On return, the carry flag will contain the lease
+; significant bit of the integer.
+; Memory at the following labels is used
+;    mathprec: number of bytes in each integer
+;    mathop1:  pointer to the number to rotate
+math_ror:
+   ldy #mathprec - 1   ; init loop counter
+   clc
+.loop:
+   lda (mathop1), y
+   ror
+   sta (mathop1), y
+   dey
+   bpl .loop
+
+   rts
+}   ; end of zone rotate_right
+
+!zone bcd {
+!macro set_param_bcd .a, .res {
+   lda #<.a          ; set up pointer to binary input
+   sta mathop1
+   lda #>.a
+   sta mathop1 + 1
+   lda #<.res        ; set up pointer to result
+   sta mathres
+   lda #>.res
+   sta mathres + 1
+}
+
+; Convert a number to BCD.
+;
+; Memory at the following labels is used as input
+;    mathprec: number of bytes in each integer
+;    mathop1:  pointer to the number to convert
+;    mathres:  pointer to the memory to receive the result.
+;
+; Memory at the following labels is used internally:
+;    tmpaddr: used to save X & Y during subroutine calls
+; Notes:
+;  1. the output may require more bytes than the input.
+
+math_bcd:
+   lda #$00         ; zero out result area
+   ldy #mathbcdprec - 1
+.zero_loop
+   sta (mathres), y
+   dey
+   bpl .zero_loop
+
+   ldy #mathprec    ; number of bytes to convert
+   ldx #$08         ; number of bits in a byte
+
+.byte_loop:
+   sty tmpaddr      ; preserve x & y
+.bit_loop:
+   stx tmpaddr + 1
+
+   jsr math_rol     ; load Most Significant Bit into Carry
+
+   ; Add bit to the result
+   sei
+   sed
+   ldy #$00
+   ldx #mathbcdprec
+.add_loop:
+   lda (mathres), y
+   adc (mathres), y
+   sta (mathres), y
+   iny
+   dex
+   bne .add_loop
+   cld
+   cli
+
+   ldy tmpaddr     ; retrieve X & Y
+   ldx tmpaddr + 1
+
+   ; proceed to next bit of current input byte
+   dex
+   bne .bit_loop
+
+   ; proceed to next input byte
+   ldx #$08           ; 8 bits in a byte
+   dey
+   bne .byte_loop
+
+   rts
+}  ; end of zone bcd
+
+!zone digit_sum {
+!macro math_set_param_digit_sum .op, .res {
+   lda #<.op
+   sta mathop1
+   lda #>.op
+   sta mathop1 + 1
+   lda #<.res
+   sta mathres
+   lda #>.res
+   sta mathres + 1
+}
+;
+; Sums all the digits in a number
+;
+; Memory at the following labels is used as input
+;    mathop1:  pointer to the number to sum
+;    mathres:  pointer to the memory to receive the result.
+;              This must be mathprec bytes.
+.intermediate=*
+!fill mathbcdprec, 0
+
+; two bytes at which to save the original value of mathres
+.tmpres=*
+!fill 2, 0
+
+math_digit_sum:
+; Zero out the memory at mathres
+   lda #$00
+   ldy #mathprec - 1
+.initLoop1:
+   sta (mathres), y
+   dey
+   bpl .initLoop1
+   
+; Save original value of mathres
+   lda mathres
+   sta .tmpres
+   lda mathres + 1
+   sta .tmpres + 1
+
+; point mathres at our intermediate result memory
+   lda #<.intermediate
+   sta mathres
+   lda #>.intermediate
+   sta mathres + 1
+
+; Zero out the space for the BCD number
+   ldy #mathbcdprec - 1
+.initLoop2:
+   sta .intermediate, y
+   dey
+   bpl .initLoop2
+
+; convert input at mathop1 to BCD in .intermediate
+   jsr math_bcd
+
+; restore original value of mathres
+   lda .tmpres
+   sta mathres
+   lda .tmpres + 1
+   sta mathres + 1
+
+; Add up the digits
+   ldx #mathbcdprec - 1
+.addhi:
+   lda .intermediate, x
+   lsr
+   lsr
+   lsr
+   lsr
+   clc
+   ldy #$00
+   adc (mathres), y
+   sta (mathres), y
+
+; handle carries for hi digit
+   bcc .addlo
+.carry1:
+   clc                  ; clear carry flag
+   lda #$01             ; Set Accumulator to 1 in lieu of Carry Flag
+   iny
+   cpy #mathprec        ; Is it safe to store?
+   beq .overflow
+   clc
+   adc (mathres), y     ; Add to result
+   sta (mathres), y
+   bcs .carry1
+
+.addlo
+   lda .intermediate, x
+   and #$0F
+   clc
+   ldy #$00
+   adc (mathres), y
+   sta (mathres), y
+
+; handle carries for lo digit
+   bcc .next
+.carry2:
+   clc                  ; clear carry flag
+   lda #$01             ; Set Accumulator to 1 in lieu of Carry Flag
+   iny
+   cpy #mathprec        ; Is it safe to store?
+   beq .overflow
+   clc
+   adc (mathres), y     ; Add to result
+   sta (mathres), y
+   bcs .carry2
+   
+; next byte
+.next
+   dex
+   bpl .addhi
+
+   rts
+
+.overflow
+   +overflow
+}
+
+!zone multiply_byte {
+;
+; Multiplies two one-byte integers, returning a two-byte product
+; Registers:
+;  A: Multiplicand, not preserved
+;  Y: Multiplier, not preserved
+;  X: not used
+; Returns:
+;  product_byte contains the 16-bit result
+;
+product_byte=*
+!byte $00, $00
+.m1=*
+!byte $00
+.m2=*
+!byte $00, $00
+
+math_multiply_byte:
+   sta .m1
+   sty .m2
+   lda #$00
+   sta .m2 + 1
+   sta product_byte
+   sta product_byte + 1
+
+;
+; Is m1 even?
+;
+.loop:
+   lda #$01
+   bit .m1
+   beq .skipadd
+
+;
+; Add m2 to product_byte
+;
+   clc
+   lda .m2
+   adc product_byte
+   sta product_byte
+   lda .m2 + 1
+   adc product_byte + 1
+   sta product_byte + 1
+
+;
+; double m2
+;
+.skipadd
+   asl .m2
+   rol .m2 + 1
+
+;
+; halve m1
+;
+   lsr .m1
+   bne .loop
+   rts
+
+}  ; end of zone multiply_byte
+
+!zone multiply {
+!macro math_set_param_multiply .m1, .m2, .p {
+   lda #<.m1
+   sta mathop1
+   lda #>.m1
+   sta mathop1 + 1
+   lda #<.m2
+   sta mathop2
+   lda #>.m2
+   sta mathop2 + 1
+   lda #<.p
+   sta mathres
+   lda #>.p
+   sta mathres + 1
+}
+
+;
+; Multiplies two multi-byte integers
+; Much like multiplying two 32-bit integers in a higher-level
+; language, the result is required to fit in an integer of the
+; same size.
+;
+; Memory at the following labels is used as input
+;    mathop1: pointer to the multiplicand
+;             Neither the pointer nor its memory is altered.
+;    mathop2: pointer to the multiplier
+;             Neither the pointer nor its memory is altered.
+;    mathres:  pointer to the product
+;              This memory returns the product.
+;
+; memory for the number being multiplied
+.multiplicand=*
+!fill mathprec, 0
+; memory for the multiplier
+.multiplier=*
+!fill mathprec, 0
+.product=*
+!fill 2 * mathprec, 0
+.j=*
+!byte $00
+.k=*
+!byte $00
+
+math_multiply:
+;
+; Zero out the product
+;
+   lda #$00
+   ldy #2*mathprec - 1
+.initLoop1:
+   sta .product, y
+   dey
+   bne .initLoop1        ; can't use bpl as mathprec may be >64
+   sta .product, y       ; clear zero'th index
+
+; Make copies of the multiplicand and multiplier
+   ldy #mathprec - 1
+.initLoop2
+   lda (mathop1), y     ; copy multiplicand
+   sta .multiplicand, y
+   lda (mathop2), y     ; copy multiplier
+   sta .multiplier, y
+   dey
+   bpl .initLoop2
+
+;
+; For each byte of the multiplier (j)
+;
+   ldx #$00
+   stx .j
+.forj:
+   lda .multiplier, x
+   beq .nextj           ; if this byte is zero, this loop iteration can be skipped
+   tay                  ; y contains one of the arguments for math_multiply_byte
+
+;
+; For each byte of the multiplicand (k)
+;
+   ldx #$00
+   stx .k
+.fork:
+   lda .multiplicand, x
+   beq .nextk          ; if this byte is zero, this iteration can be skipped
+
+; Multiply the two bytes
+   jsr math_multiply_byte
+
+; The offset into .product is .j + .k
+   lda .j
+   clc
+   adc .k
+   bcs .overflow      ; If j + k is too big...
+   tax
+
+; Add the two-byte partial result from product_byte into .product
+   lda product_byte
+   adc .product, x
+   sta .product, x
+   inx
+   lda product_byte + 1
+   adc .product, x
+   sta .product, x
+
+.carry:
+   lda #$00           ; transfer Carry flag to Accumulator
+   adc #$00
+   beq .nextk         ; If no carry, "goto next k"
+
+   inx                ; Is it safe to store this carry?
+   cpx #mathprec
+   bpl .overflow      ; branch if NOT safe to store
+   adc .product, x
+   sta .product, x
+   bcs .carry
+
+; next multiplicand byte
+.nextk:
+   ldx .k
+   inx
+   stx .k
+   cpx #mathprec
+   bmi .fork
+
+; next multiplier byte
+.nextj:
+   ldx .j
+   inx
+   stx .j
+   cpx #mathprec
+   bmi .forj
+
+; check for overflow 
+; Integers are constrained to be all the same size
+; so the top half of .product must be all zero.
+   ldy #2 * mathprec
+   dey
+.overflowcheck:
+   lda .product, y
+   bne .overflow
+   dey
+   cpy #mathprec
+   bpl .overflowcheck
+
+; Copy the product to (mathres)
+   ldy #mathprec - 1
+.copyres:
+   lda .product, y
+   sta (mathres), y
+   dey
+   bpl .copyres
+
+   rts
+
+.overflow:
+   lda #<overflow
+   sta straddr
+   lda #>overflow
+   sta straddr + 1
+   jsr subprint
+   jmp $E37B       ; drop back to READY
+
+}   ; end of zone multiply
+
+!zone factorial {
+;
+; Calculates the factorial of the given number
+;
+; Memory at the following labels is used as input
+;    accumulator: The number for which factorial is to be calculated
+;    mathres:  pointer to the result
+;
+; Memory at the following labels is altered
+;    mathop1:
+;    mathop2:
+;
+
+; A loop counter for the numbers being multiplied
+.j=*
+!byte $00
+
+; upper limit for j loop
+.jul=*
+!byte $00
+
+.factor=*
+!fill mathprec, $00
+
+math_factorial:
+   sta .jul             ; save argument
+
+; fill (.factor), and (mathres) with one
+   ldy #mathprec - 1
+.initLoop:
+   lda one, y
+   sta .factor, y
+   sta (mathres), y
+   dey
+   bpl .initLoop
+
+; point mathop1 to .factor
+   lda #<.factor
+   sta mathop1
+   lda #>.factor
+   sta mathop1 + 1
+
+; copy mathres to mathop2
+   lda mathres
+   sta mathop2
+   lda mathres + 1
+   sta mathop2 + 1
+
+   lda #$01
+   sta .j
+   jmp .next
+.for:
++  ldy #$00              ; set (mathop1) to current factor being multiplied
+   sta (mathop1), y      ; the higher bytes of (mathop1) are always zero.
+
+   jsr math_multiply
+
+.next:
+   inc .j                ; increment loop counter
+   lda .j
+   cmp .jul              ; loop on (.j) <= (.jul)
+   bmi .for
+   beq .for
+   
+   rts
+}   ; end of zone factorial
+}
+

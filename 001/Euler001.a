@@ -1,0 +1,199 @@
+;@com.wudsn.ide.asm.hardware=C64
+!to "Euler001.prg", cbm 
+!cpu 6510
+!sl "Euler001.labels"
+
+; BASIC program: (Where .run is replaced by its address.)
+;   10 SYS .run
+* = $0801
+    !byte <.basend,>.basend,$0A,$00,$9e
+    !byte .run/10000 + '0'    
+    !byte .run/1000 % 10 + '0'    
+    !byte .run/100 % 10 + '0'   
+    !byte .run/10 % 10 + '0' 
+    !byte .run % 10 + '0' 
+    !byte 0
+.basend !byte 0, 0
+
+mathprec=$03
+mathbcdprec=$04
+
+!source "preamble.a"
+!source "screen.a"
+!source "bitvector.a"
+!source "arithmetic.a"
+
+.answer !scr "the answer is ", 0
+
+; The current multiple of 3 or 5
+.m=*
+!byte $00, $00
+
+; loop counter
+.j=*
+!byte $00, $00
+; .j will be passed to math_add as a parameter, so
+; it needs to be big enough for that even though it
+; will never go above 1,000.
+!fill mathprec - 2, $00
+
+; The upper limit is 1,000 (not inclusive)
+.jul=*
+!byte $e8, $03
+
+.sum=*
+!fill mathprec, $00
+
+.sumbcd=*
+!fill mathbcdprec, $00
+
+.run:
+   jsr subclearscreen
+   jsr bitvector_clear
+
+;
+; set bits that are at multiples of three
+;
+
+; .m = 3
+  lda #$03
+  sta .m
+  lda #$00
+  sta .m + 1 
+
+.loop3
+; Mark current multiple of 3
+   lda .m
+   ldy .m + 1
+   jsr bitvector_setbit
+
+; .m = .m + 3
+   clc
+   lda .m
+   adc #$03
+   sta .m
+   lda .m + 1
+   adc #$00
+   sta .m + 1
+
+; Is .m < 1000?
+   sec             ; calculate .m - .jul
+   lda .m
+   sbc .jul
+   lda .m + 1
+   sbc .jul + 1
+   bmi .loop3      ; loop if .m < .jul
+
+;
+; Set bits that are at multiples of 5
+;
+
+; .m = 5
+  lda #$05
+  sta .m
+  lda #$00
+  sta .m + 1 
+
+.loop5
+; Mark current multiple of 5
+   lda .m
+   ldy .m + 1
+   jsr bitvector_setbit
+
+; .m = .m + 5
+   clc
+   lda .m
+   adc #$05
+   sta .m
+   lda .m + 1
+   adc #$00
+   sta .m + 1
+
+; Is .m < 1000?
+   sec             ; calculate .m - .jul
+   lda .m
+   sbc .jul
+   lda .m + 1
+   sbc .jul + 1
+   bmi .loop5      ; loop if .m < .jul
+
+;
+; Add the indices of bits that are set
+;
+
+; .sum = 0
+   lda #$00
+   ldy #mathprec - 1
+.initsum:
+   sta .sum, y
+   dey
+   bpl .initsum
+
+; point mathop1 to .j
+   lda #<.j
+   sta mathop1
+   lda #>.j
+   sta mathop1 + 1
+
+; point mathop2 & mathres to .sum
+   lda #<.sum
+   sta mathop2
+   sta mathres
+   lda #>.sum
+   sta mathop2 + 1
+   sta mathres + 1
+
+; .j = 1
+   lda #$01
+   sta .j
+   lda #$00
+   sta .j + 1
+.forj:
+; Is the .j'th bit set?
+   lda .j
+   ldy .j + 1
+   jsr bitvector_getbit
+   beq .nextj
+
+; .sum = .sum + .j
+   jsr math_add
+
+.nextj:
+; increment .j
+   clc
+   lda .j
+   adc #$01
+   sta .j
+   lda .j + 1
+   adc #$00
+   sta .j + 1
+; test .j < .jul
+   sec
+   lda .j
+   sbc .jul
+   lda .j + 1
+   sbc .jul + 1
+   bmi .forj      ; loop if .j < .jul
+
+; Print the answer
+   lda #<.answer
+   sta straddr
+   lda #>.answer
+   sta straddr + 1
+   jsr subprint
+
+   lda #<.sum        ; point mathop1 to .sum
+   sta mathop1
+   lda #>.sum
+   sta mathop1 + 1
+
+   lda #<.sumbcd     ; point mathres to .sumbcd
+   sta mathres
+   lda #>.sumbcd
+   sta mathres + 1
+   
+   jsr math_bcd
+   jsr sub_outputBCD
+
+   rts
+
