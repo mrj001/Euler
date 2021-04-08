@@ -1,4 +1,5 @@
 ; Screen routines
+
 !zone screen {
     .screencols = 40
     .screenrows = 25
@@ -150,9 +151,8 @@ subprintonechar:
 !byte $00
 
 sub_outputBCD:
-    ; ldy mathbcdprec     ; load y with number of bytes
-    dey                 ; y is zero-based index.
-    lda #$00            ; suppress leading zeroes
+    ldy #mathbcdprec - 1 ; load y with index of MSB
+    lda #$00             ; suppress leading zeroes
     sta .zero_suppress
 
     ; output high nybble
