@@ -1,0 +1,122 @@
+;@com.wudsn.ide.asm.hardware=C64
+!to "Primes.prg", cbm 
+!cpu 6510
+!sl "Primes.labels"
+
+; BASIC program: (Where run is replaced by its address.)
+;   10 SYS run
+* = $0801
+    !byte <.basend,>.basend,$0A,$00,$9e
+    !byte run/1000 % 10 + '0'    
+    !byte run/100 % 10 + '0'   
+    !byte run/10 % 10 + '0' 
+    !byte run % 10 + '0' 
+    !byte 0
+.basend !byte 0, 0
+
+!src "preamble.a"
+
+; This macro prints a string
+!macro print_label .lbl {
+    lda #<.lbl
+    sta+1 straddr
+    lda #>.lbl
+    sta+1 straddr + 1
+    jsr subprint
+}
+
+; loop counter
+.j=*
+!byte $00, $00
+
+; loop limit: 181 = floor(sqrt(32768))
+; This will allow us to find all the primes up to 32768,
+; which is the length of the bit vector.
+.jul=*
+!byte $b5, $00
+
+; inner loop counter
+; This counts the multiples of .j to mark them as composite.
+; This starts at 2 * .j and continues while .m < 32768
+.m=*
+!byte $00, $00
+
+
+;---------------------------------------------------
+; Sieve of Eratosthenes in a bit vector.
+; The set bits indicate composite numbers.
+;---------------------------------------------------
+run:
+   jsr bitvector_clear
+
+; for .j = 2
+   lda #$02
+   sta .j
+   lda #$00
+   sta .j + 1
+
+.forj:
+; .m = 2 * .j
+   lda .j
+   asl
+   sta .m
+   lda .j + 1
+   rol
+   sta .m + 1
+   
+; mark .m as composite by setting its bit.
+.form:
+   lda .m
+   ldy .m + 1
+   jsr bitvector_setbit
+
+.nextm:
+; .m += .j
+   clc
+   lda .m
+   adc .j
+   sta .m
+   lda .m + 1
+   adc .j + 1
+   sta .m + 1
+
+; test .m <= 32767 (32768 is the length of the bitvector)
+; branch until bit 15 of .m is set
+   and #$80
+   beq .form
+
+.nextj:
+; do
+;    .j ++
+; while .j is composite and .j <= .jul
+   clc
+   lda .j
+   adc #$01
+   sta .j
+   lda #$00
+   adc .j + 1
+   sta .j + 1
+
+; Is .j <= .jul
+   sec
+   lda .j
+   sbc .jul
+   lda .j + 1
+   sbc .jul + 1
+   beq .testjcomposite   ; branch if .j == .jul 
+   bpl .donesieve        ; branch if .j > .jul (i.e. done)
+
+; Is .j composite?
+.testjcomposite:
+   ldy .j + 1
+   lda .j
+   jsr bitvector_getbit
+   bne .nextj            ; branch if .j is composite
+   jmp .forj
+
+.donesieve:
+   rts
+
+;
+!src "bitvector.a"
+
