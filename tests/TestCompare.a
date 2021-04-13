@@ -290,7 +290,7 @@ test5:
 
 !zone test6 {
 ;
-; Test 5: Compare 314 and 1,000,000 to confirm that it is less than.
+; Test 6: Compare 314 and 1,000,000 to confirm that it is less than.
 ;   op1 < op2
 ;
 .a1=*
