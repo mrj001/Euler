@@ -327,7 +327,48 @@ test6:
 .result
     jsr subprint
 
-    rts
+    jmp test7
 }  ; end zone test6
 
+!zone test7 {
+;
+; Test 7: Compare $e589eac7 to $05 to confirm
+;   that it is larger.
+;
+.a1=*
+!byte $c7, $ea, $89, $e5, $00
+.a2=*
+!byte $05, $00, $00, $00, $00
+.expected=$01  ; N & Z clear; C set
+.lbl !scr "seven: ", 0
+
+test7:
+    ; set up
+    +print_label .lbl
+    +set_param .a1, .a2
+
+    ; action
+    jsr math_compare
+
+    ; assert $e589eac7 > $05
+    bpl .pass
+
+.fail
+    lda #<fail
+    sta straddr
+    lda #>fail
+    sta straddr + 1
+    jmp .result
+
+.pass
+    lda #<pass
+    sta straddr
+    lda #>pass
+    sta straddr + 1
+
+.result
+    jsr subprint
+
+    rts
+}   ; end zone test7
 
