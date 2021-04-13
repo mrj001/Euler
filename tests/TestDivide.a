@@ -1,0 +1,183 @@
+;@com.wudsn.ide.asm.hardware=C64
+!to "TestDivide.prg", cbm 
+!cpu 6510
+!sl "TestDivide.labels"
+
+; BASIC program: (Where .run is replaced by its address.)
+;   10 SYS .run
+* = $0801
+    !byte <.basend,>.basend,$0A,$00,$9e
+    !byte .run/10000 + '0'    
+    !byte .run/1000 % 10 + '0'    
+    !byte .run/100 % 10 + '0'   
+    !byte .run/10 % 10 + '0' 
+    !byte .run % 10 + '0' 
+    !byte 0
+.basend !byte 0, 0
+
+; define constants
+mathprec=$03
+mathbcdprec=$04
+
+!source "../libs/preamble.a"
+!source "../libs/screen.a"
+!source "../libs/arithmetic.a"
+
+; This macro prints a string
+!macro print_string .str {
+    lda #<.str
+    sta+1 straddr
+    lda #>.str
+    sta+1 straddr + 1 
+    jsr subprint
+}
+
+pass !scr "pass", 13, 0
+fail !scr "fail", 13, 0
+
+; Clear screen before running tests
+.run
+    jsr subclearscreen
+    jmp test1
+
+!zone test1 {
+;
+; Test 1: Divide two single-byte integers, with no remainder
+;
+.dividend=*
+!byte $64, $00, $00
+.divisor=*
+!byte $19, $00, $00
+.expectedquotient=*
+!byte $04, $00, $00
+.expectedremainder=*
+!byte $00, $00, $00
+.l1 !scr "one: ",0
+
+test1
+   +print_string .l1
+   +math_set_param_divide .dividend, .divisor
+
+   jsr math_divide
+
+   +set_param_isequal .expectedquotient, quotient
+   jsr math_isequal
+   bne .fail
+
+   +set_param_isequal .expectedremainder, remainder
+   jsr math_isequal
+   bne .fail
+
+.pass:
+   lda #<pass
+   sta straddr
+   lda #>pass
+   sta straddr + 1
+   jmp .print
+
+.fail:
+   lda #<fail
+   sta straddr
+   lda #>fail
+   sta straddr + 1
+
+.print:
+   jsr subprint
+
+   jmp test2
+}   ; end of zone test1
+
+!zone test2 {
+;
+; Test 2: Divide two multi-byte integers, with no remainder
+;
+.dividend=*
+!byte $b5, $22, $00   ; 8885 == 5 * 1777
+.divisor=*
+!byte $f1, $06, $00   ; 1777
+.expectedquotient=*
+!byte $05, $00, $00
+.expectedremainder=*
+!byte $00, $00, $00
+.lbl !scr "two: ",0
+
+test2
+   +print_string .lbl
+   +math_set_param_divide .dividend, .divisor
+
+   jsr math_divide
+
+   +set_param_isequal .expectedquotient, quotient
+   jsr math_isequal
+   bne .fail
+
+   +set_param_isequal .expectedremainder, remainder
+   jsr math_isequal
+   bne .fail
+
+.pass:
+   lda #<pass
+   sta straddr
+   lda #>pass
+   sta straddr + 1
+   jmp .print
+
+.fail:
+   lda #<fail
+   sta straddr
+   lda #>fail
+   sta straddr + 1
+
+.print:
+   jsr subprint
+
+   jmp test3
+}   ; end of zone test2
+
+!zone test3 {
+;
+; Test 3: Divide two multi-byte integers, with a remainder
+;
+.dividend=*
+!byte $9e, $7c, $0e   ; 949406 = 971 * 977 + 739
+.divisor=*
+!byte $d1, $03, $00   ; 977
+.expectedquotient=*
+!byte $cb, $03, $00   ; 971
+.expectedremainder=*
+!byte $e3, $02, $00   ; 739
+.lbl !scr "three: ",0
+
+test3
+   +print_string .lbl
+   +math_set_param_divide .dividend, .divisor
+
+   jsr math_divide
+
+   +set_param_isequal .expectedquotient, quotient
+   jsr math_isequal
+   bne .fail
+
+   +set_param_isequal .expectedremainder, remainder
+   jsr math_isequal
+   bne .fail
+
+.pass:
+   lda #<pass
+   sta straddr
+   lda #>pass
+   sta straddr + 1
+   jmp .print
+
+.fail:
+   lda #<fail
+   sta straddr
+   lda #>fail
+   sta straddr + 1
+
+.print:
+   jsr subprint
+
+   rts
+}   ; end of zone test3
+
