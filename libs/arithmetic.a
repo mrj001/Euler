@@ -67,7 +67,13 @@ math_isequal:
 ; Outputs:
 ;  Flags are set as though a subtraction had been done.
 ;
+; Flags for masking off the Zero Flag.  The Zero Flag
+; should only be set if ALL bytes of the result are zero.
+.zero=*
+!byte $00
 math_compare:
+    lda #$ff        ; initialize zero flag
+    sta .zero
     ldx #mathprec   ; load count of bytes per integer
     ldy #$00        ; index into bytes of integer
     sec
@@ -77,10 +83,18 @@ math_compare:
     lda (mathop1), y
     sbc (mathop2), y
     php             ; preserve flags
+    beq +
+    lda #$fd        ; clear the bit corresponding to the Zero Flag
+    and .zero
+    sta .zero
++
     iny             ; alters N & Z
     dex             ; alters N & Z
     bne .nextbyte
-    plp             ; restore flags after last subtraction
+    pla             ; transfer flags after last subtraction
+    and .zero       ; clear zero bit if any result byte was non-zero
+    pha             ; transfer modified flags from A to P
+    plp
     rts
 }
 
