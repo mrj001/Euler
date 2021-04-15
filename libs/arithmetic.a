@@ -56,27 +56,31 @@ math_isequal:
 
 !zone compare {
 ; Set flags N, Z & C as though a subtraction of a multi-byte integer
-; had been done.  (i.e. op1 - op2).  Unlike an actual subtraction,
-; the V flag is not affected.
+; had been done.  (i.e. op1 - op2).
 ; This is analogous to a CMP, but for multiple bytes.
-; Memory at the following labels is used
+;
+; Inputs:
 ;    mathprec: number of bytes in each integer
 ;    mathop1: pointer to first integer to compare
 ;    mathop2: pointer to second integer to compare
+;
+; Outputs:
+;  Flags are set as though a subtraction had been done.
+;
 math_compare:
-    ldy #mathprec   ; load count of bytes per integer
-    dey             ; index will be zero-based
-    php             ; needed for correct stack usage
+    ldx #mathprec   ; load count of bytes per integer
+    ldy #$00        ; index into bytes of integer
+    sec
+    php             ; needed to offset pull at start of loop
 .nextbyte:
-    plp             ; offset push of flags at end of loop
+    plp             ; retrieve flags from subtraction of the previous byte
     lda (mathop1), y
-    cmp (mathop2), y
-    bne .end        ; not equal - flags are set
+    sbc (mathop2), y
     php             ; preserve flags
-    dey             ; will alter N & Z flags
-    bpl .nextbyte
-    plp             ; restore flags from last byte comparison
-.end
+    iny             ; alters N & Z
+    dex             ; alters N & Z
+    bne .nextbyte
+    plp             ; restore flags after last subtraction
     rts
 }
 
