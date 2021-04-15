@@ -1,0 +1,269 @@
+;@com.wudsn.ide.asm.hardware=C64
+!to "Euler003.prg", cbm 
+!cpu 6510
+!sl "Euler003.labels"
+
+; BASIC program: (Where run is replaced by its address.)
+;   10 SYS run
+* = $0801
+    !byte <.basend,>.basend,$0A,$00,$9e
+    !byte run/1000 % 10 + '0'    
+    !byte run/100 % 10 + '0'   
+    !byte run/10 % 10 + '0' 
+    !byte run % 10 + '0' 
+    !byte 0
+.basend !byte 0, 0
+
+mathprec=$06
+mathbcdprec=$08
+
+!src "preamble.a"
+!src "screen.a"
+!src "arithmetic.a"
+
+; This macro prints a string
+!macro print_string .str {
+    lda #<.str
+    sta+1 straddr
+    lda #>.str
+    sta+1 straddr + 1
+    jsr subprint
+}
+
+; loop counter
+.j=*
+!byte $00, $00
+
+; loop limit: 181 = floor(sqrt(32768))
+; This will allow us to find all the primes up to 32768,
+; which is the length of the bit vector.
+.jul=*
+!byte $b5, $00
+
+; inner loop counter
+; This counts the multiples of .j to mark them as composite.
+; This starts at 2 * .j and continues while .m < 32768
+.m=*
+!byte $00, $00
+
+
+;---------------------------------------------------
+; Sieve of Eratosthenes in a bit vector.
+; The set bits indicate composite numbers.
+;---------------------------------------------------
+run:
+   jsr subclearscreen
+   jsr bitvector_clear
+
+; for .j = 2
+   lda #$02
+   sta .j
+   lda #$00
+   sta .j + 1
+
+.forj:
+; .m = 2 * .j
+   lda .j
+   asl
+   sta .m
+   lda .j + 1
+   rol
+   sta .m + 1
+   
+; mark .m as composite by setting its bit.
+.form:
+   lda .m
+   ldy .m + 1
+   jsr bitvector_setbit
+
+.nextm:
+; .m += .j
+   clc
+   lda .m
+   adc .j
+   sta .m
+   lda .m + 1
+   adc .j + 1
+   sta .m + 1
+
+; test .m <= 32767 (32768 is the length of the bitvector)
+; branch until bit 15 of .m is set
+   and #$80
+   beq .form
+
+.nextj:
+; do
+;    .j ++
+; while .j is composite and .j <= .jul
+   clc
+   lda .j
+   adc #$01
+   sta .j
+   lda #$00
+   adc .j + 1
+   sta .j + 1
+
+; Is .j <= .jul
+   sec
+   lda .j
+   sbc .jul
+   lda .j + 1
+   sbc .jul + 1
+   beq .testjcomposite   ; branch if .j == .jul 
+   bpl .donesieve        ; branch if .j > .jul (i.e. done)
+
+; Is .j composite?
+.testjcomposite:
+   ldy .j + 1
+   lda .j
+   jsr bitvector_getbit
+   bne .nextj            ; branch if .j is composite
+   jmp .forj
+
+.donesieve:
+   jmp factorize
+
+;---------------------------------------------------
+; Divide the number 600851475143 by the prime
+; numbers in order to find the largest prime factor.
+;---------------------------------------------------
+.answer !scr "the answer is ", 0
+
+.givennumber=*
+!byte $c7, $ea, $89, $e5, $8b
+!fill mathprec - 5, $00
+
+; The current prime number being divided into
+; the given number.
+.curdivisor=*
+!fill mathprec, $00
+
+.largestsofar=*
+!fill mathprec, $00
+
+.largestfactorbcd=*
+!fill mathbcdprec, $00
+
+factorize:
+; By inspection, we can see that the number is odd,
+; so we won't try 2, we'll start with 3.
+; .curdivisor = 3
+   lda #$03
+   sta .curdivisor
+   ldy #mathprec - 1
+   lda #$00
+.initfactor:
+   sta .curdivisor, y
+   dey
+   bne .initfactor
+
+.divide:
+; point mathop2 to the current divisor
+   lda #<.curdivisor
+   sta mathop2
+   lda #>.curdivisor
+   sta mathop2 + 1
+
+; point mathop1 to the given number
+   lda #<.givennumber
+   sta mathop1
+   lda #>.givennumber
+   sta mathop1 + 1
+
+   jsr math_divide
+
+; Is the remainder zero?
+   ldy #mathprec - 1
+.checkzeroremainder:
+   lda remainder, y
+   bne .endifzeroremainder         ; branch if the remainder is not zero.
+   dey
+   bpl .checkzeroremainder
+
+; Yes, the remainder is zero....
+; Is the .curdivisor > .largestsofar?
+   lda #<.curdivisor
+   sta mathop1
+   lda #>.curdivisor
+   sta mathop1 + 1
+   lda #<.largestsofar
+   sta mathop2
+   lda #>.largestsofar
+   sta mathop2 + 1
+   jsr math_compare
+   bcc .skipcopycurfactor   ; branch if .curdivisor <  .largestsofar
+   beq .skipcopycurfactor   ; branch if .curdivisor == .largestsofar
+
+; .largestsofar = .curdivisor
+   ldy #mathprec - 1
+.copycurfactor:
+   lda .curdivisor, y
+   sta .largestsofar, y
+   dey
+   bpl .copycurfactor
+
+.skipcopycurfactor:
+; Since the remainder was zero, copy the quotient to
+; the given number
+   ldy #mathprec - 1
+.copyquotient:
+   lda quotient, y
+   sta .givennumber, y
+   dey
+   bpl .copyquotient
+
+; Since the remainder was zero, try to divide by
+; this prime again.
+   jmp .divide
+
+.endifzeroremainder:
+.nextprime:
+; .curdivisor += 2
+   clc
+   lda .curdivisor
+   adc #$02
+   sta .curdivisor
+   ldy #$01
+   ldx #mathprec - 1
+.curdivisorplus2:
+   lda .curdivisor, y
+   adc #$00
+   sta .curdivisor, y
+   iny
+   dex
+   bne .curdivisorplus2
+
+; Is .curdivisor prime?
+; Note assumption that all required primes fit in two bytes....
+   lda .curdivisor
+   ldy .curdivisor + 1
+   jsr bitvector_getbit
+   bne .nextprime         ; if not prime, try again
+
+; If the remaining value in given number is less than the current divisor
+; then we are done
+   lda #<.givennumber
+   sta mathop1
+   lda #>.givennumber
+   sta mathop1 + 1
+   lda #<.curdivisor
+   sta mathop2
+   lda #>.curdivisor
+   sta mathop2 + 1
+   jsr math_compare
+   bmi .done
+
+   jmp .divide            ; .curdivisor is prime and >= .givennumber, try dividing.
+
+.done:
+   +print_string .answer
+
+   +set_param_bcd .largestsofar, .largestfactorbcd
+   jsr math_bcd
+   jsr sub_outputBCD
+
+   rts
+
+;
+!src "bitvector.a"
+
