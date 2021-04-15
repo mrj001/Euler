@@ -297,7 +297,11 @@ test5:
 !byte $3a, $01, $00, $00, $00
 .a2=*
 !byte $40, $42, $0f, $00, $00
-.expected=$01  ; N & Z clear; C set
+.expected=$80
+; Expected:
+;  N set because the result is negative
+;  Z clear because the result is not zero
+;  C clear because a borrow was necessary
 .lbl !scr "six: ", 0
 
 test6:
@@ -309,7 +313,11 @@ test6:
     jsr math_compare
 
     ; assert 314 < 1,000,000
-    bmi .pass
+    php
+    pla
+    and flagmask
+    cmp #.expected
+    beq .pass
 
 .fail
     lda #<fail
