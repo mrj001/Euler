@@ -32,6 +32,10 @@ one=*
 !byte $01
 !fill mathprec - 1, $00
 
+ten=*
+!byte $0a
+!fill mathprec - 1, $00
+
 ; Compares two integers for equality
 ; Memory at the following labels is used
 ;    mathprec: number of bytes in each integer
