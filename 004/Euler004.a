@@ -162,6 +162,7 @@ run:
    jmp .forj
 
 .outputresults:
+   jsr subclearscreen
    +print_string .answer
    +set_param_bcd largest, largestbcd
    jsr math_bcd
