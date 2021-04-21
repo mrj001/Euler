@@ -1,0 +1,115 @@
+; Checking whether or not a number is a palindrome
+
+; Include arithmetic.a before this file
+
+!zone palindrome {
+.decimal=*
+!fill 2 * mathbcdprec, $00
+
+.decimalindex=*
+!byte $00
+
+.operand=*
+!fill mathprec, $00
+
+;
+; Determines whether the specified number is a palindrome
+;
+; Inputs:
+;  mathop1: points to the number to test
+;
+; Outputs:
+;  If the number is a palindrome, the accumulator will
+;  contain zero; otherwise 1.  This also has the effect
+;  of setting the Z Flag if the number is a palindrome.
+;
+; Side Effects:
+;  mathop1 & mathop2 are altered
+;
+; Notes:
+;  1. As the decimal area is 2 * mathbcdprec, this 
+;     subroutine is limited to smaller numbers than 
+;     the usual max mathprec of 127.
+;
+is_palindrome:
+; zero out the decimal area
+   ldy #2 * mathbcdprec - 1
+   lda #$00
+-  sta .decimal, y
+   dey
+   bne -
+   sta .decimal
+
+; copy (mathop1) to .operand so we don't change it.
+   ldy #mathprec - 1
+-- lda (mathop1), y
+   sta .operand, y
+   dey
+   bpl --
+
+; Convert to decimal
+   lda #<ten            ; point mathop2 to ten
+   sta mathop2
+   lda #>ten
+   sta mathop2 + 1
+
+   ldx #$ff             ; X will index into .decimal
+   stx .decimalindex
+
+; point mathop1 to .operand (mathop1 is altered by math_divide)
+.convert:
+   lda #<.operand
+   sta mathop1
+   lda #>.operand
+   sta mathop1 + 1
+
+   jsr math_divide
+
+; copy the digit to .decimal
+   lda remainder
+   inc .decimalindex
+   ldx .decimalindex
+   sta .decimal, x
+
+; Copy the quotient to .operand
+   ldy #mathprec - 1
+.copyquotient:
+   lda quotient, y
+   sta .operand, y
+   dey
+   bpl .copyquotient
+
+; Is .operand equal to zero?
+   ldy #mathprec - 1
+.checkzero:
+   lda .operand, y
+   bne .convert
+   dey
+   bpl .checkzero
+
+;
+; check if .decimal contains a palindrome
+;
+; X will contain the index of the most significant digit
+; Y will contain the index of the least significant digit
+; In order to simplify this code, the loop redundantly
+; checks more digits than needed.
+   ldx .decimalindex
+   ldy #$00
+.checkpalindrome:
+   lda .decimal, x
+   cmp .decimal, y
+   bne .no
+   iny
+   dex
+   bpl .checkpalindrome
+; yes, it is a palindrome
+   lda #$00
+   rts
+; no, it is not a palindrome
+.no:
+   lda #$01
+   rts
+
+}   ; end zone palindrome
+

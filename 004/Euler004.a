@@ -1,0 +1,171 @@
+;@com.wudsn.ide.asm.hardware=C64
+!to "Euler004.prg", cbm 
+!cpu 6510
+!sl "Euler004.labels"
+
+; BASIC program: (Where run is replaced by its address.)
+;   10 SYS run
+* = $0801
+    !byte <.basend,>.basend,$0A,$00,$9e
+    !byte run/1000 % 10 + '0'    
+    !byte run/100 % 10 + '0'   
+    !byte run/10 % 10 + '0' 
+    !byte run % 10 + '0' 
+    !byte 0
+.basend !byte 0, 0
+
+mathprec=$03
+mathbcdprec=$04
+
+!src "preamble.a"
+!src "screen.a"
+!src "arithmetic.a"
+!src "palindrome.a"
+
+; This macro prints a string
+!macro print_string .str {
+    lda #<.str
+    sta+1 straddr
+    lda #>.str
+    sta+1 straddr + 1
+    jsr subprint
+}
+
+.answer !scr "the answer is ", 0
+
+; loop counter
+j=*
+!byte $64, $00
+!fill mathprec - 2, $00
+
+; loop counter
+k=*
+!byte $64, $00
+!fill mathprec - 2, $00
+
+; non-inclusive loop upper limit
+lul=*
+!byte $e8, $03
+!fill mathprec - 2, $00
+
+; product = j * k
+product=*
+!fill mathprec, $00
+
+; largest palindrome found
+largest=*
+!fill mathprec, $00
+
+; BCD version of largest palindrome
+largestbcd=*
+!fill mathbcdprec, $00
+
+run:
+; point mathres to product
+   lda #<product
+   sta mathres
+   lda #>product
+   sta mathres + 1
+
+; for j = 100; j < 1000; j ++
+   lda #$64
+   sta j
+   lda #$00
+   sta j + 1
+.forj:
+; for k = 100; k <= j; k ++
+   lda #$64
+   sta k
+   lda #$00
+   sta k + 1
+.fork:
+
+; multiply j * k
+   lda #<j
+   sta mathop1
+   lda #>j
+   sta mathop1 + 1
+   lda #<k
+   sta mathop2
+   lda #>k
+   sta mathop2 + 1
+   jsr math_multiply
+
+; is product a palindrome?
+   lda #<product
+   sta mathop1
+   lda #>product
+   sta mathop1 + 1
+   jsr is_palindrome
+   bne .nextk          ; if not a palindrome, go to nextk
+
+; product is a palindrome
+; is it the largest so far?
+   lda #<largest
+   sta mathop1
+   lda #>largest
+   sta mathop1 + 1
+   lda #<product
+   sta mathop2
+   lda #>product
+   sta mathop2 + 1
+   jsr math_compare
+   bpl .nextk            ; branch if largest > product
+
+; Copy product to largest
+   ldy #mathprec - 1
+.copy:
+   lda product, y
+   sta largest, y
+   dey
+   bpl .copy
+
+.nextk:
+   ldx #$00
+.inck:
+   inc k, x
+   bne .doneinck
+   inx
+   cpx #mathprec
+   bmi .inck
+.doneinck:
+   lda #<k
+   sta mathop1
+   lda #>k
+   sta mathop1 + 1
+   lda #<j
+   sta mathop2
+   lda #>j
+   sta mathop2 + 1
+   jsr math_compare
+   bmi .fork
+
+.nextj:
+   ldx #$00
+.incj:
+   inc j, x
+   bne .doneincj
+   inx
+   cpx #mathprec
+   bmi .incj
+.doneincj:
+   lda #<j
+   sta mathop1
+   lda #>j
+   sta mathop1 + 1
+   lda #<lul
+   sta mathop2
+   lda #>lul
+   sta mathop2 + 1
+   jsr math_compare
+   bpl .outputresults
+   jmp .forj
+
+.outputresults:
+   +print_string .answer
+   +set_param_bcd largest, largestbcd
+   jsr math_bcd
+   +set_param_outputBCD largestbcd, mathbcdprec
+   jsr sub_outputBCD
+   rts
+
