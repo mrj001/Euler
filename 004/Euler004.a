@@ -6,11 +6,16 @@
 ; BASIC program: (Where run is replaced by its address.)
 ;   10 SYS run
 * = $0801
-    !byte <.basend,>.basend,$0A,$00,$9e
-    !byte run/1000 % 10 + '0'    
+    !byte <.basend,>.basend,$0A,$00  ; line 10
+    !byte $54, $49, $24, $b2, $22    ; TI$="000000":
+    !fill $06, $30
+    !byte $22, $3a
+    !byte $9e                        ; Sys keyword
+    !byte run/1000 % 10 + '0'        ; Address for SYS
     !byte run/100 % 10 + '0'   
     !byte run/10 % 10 + '0' 
     !byte run % 10 + '0' 
+    !byte $3a, $99, $20, $54, $49    ; :PRINT TI
     !byte 0
 .basend !byte 0, 0
 
