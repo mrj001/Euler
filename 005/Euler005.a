@@ -1,0 +1,220 @@
+;@com.wudsn.ide.asm.hardware=C64
+!to "Euler005.prg", cbm 
+!cpu 6510
+!sl "Euler005.labels"
+
+; BASIC program: (Where run is replaced by its address.)
+;   10 SYS run
+* = $0801
+    !byte <.basend,>.basend,$0A,$00  ; line 10
+    !byte $54, $49, $24, $b2, $22    ; TI$="000000":
+    !fill $06, $30
+    !byte $22, $3a
+    !byte $9e                        ; Sys keyword
+    !byte run/1000 % 10 + '0'        ; Address for SYS
+    !byte run/100 % 10 + '0'   
+    !byte run/10 % 10 + '0' 
+    !byte run % 10 + '0' 
+    !byte $3a, $99, $20, $54, $49    ; :PRINT TI
+    !byte 0
+.basend !byte 0, 0
+
+mathprec=$04
+mathbcdprec=$05
+
+!src "preamble.a"
+!src "screen.a"
+!src "arithmetic.a"
+
+; This macro prints a string
+!macro print_string .str {
+    lda #<.str
+    sta+1 straddr
+    lda #>.str
+    sta+1 straddr + 1
+    jsr subprint
+}
+
+.answer !scr "the answer is ", 0
+
+; Space for an array of numbers from 0 to 20
+; indices 0 & 1 will not be used.  They're present
+; only to make the initial values equal the indices.
+numbers=*
+!fill 21*mathprec, $00
+
+; loop counter
+j=*
+!fill mathprec, $00
+
+; loop counter
+k=*
+!fill mathprec, $00
+
+; The minimum product which is sought
+minproduct=*
+!fill mathprec, $00
+
+; The BCD version of minimum product.
+minproductbcd=*
+!fill mathbcdprec, $00
+
+run:
+; init array of numbers
+   lda #$00
+   ldy #21*mathprec - 1
+.initnumbers:
+   sta numbers, y
+   dey
+   bpl .initnumbers
+
+   ldy #20
+   ldx #20 * mathprec
+   tya
+.initnumbers2:
+   sta numbers, x
+   txa
+   sec
+   sbc #mathprec
+   tax
+   dey
+   tya
+   bne .initnumbers2
+
+; init minimum product to 1.
+   ldy #mathprec - 1
+.initminproduct:
+   sta minproduct, y
+   dey
+   bne .initminproduct
+   lda #$01
+   sta minproduct
+
+;
+; for j = 2 * mathprec; j <= 10 * mathprec; j += mathprec
+; This loop will remove factors from higher numbers that are
+; present in the lower numbers.  As no number higher than
+; 10 has a multiple within the range [1, 20], we end the
+; loop with 10 * mathprec.
+; j points to the byte within the array where a number starts.
+;
+; j = 2 * mathprec
+; j will never be outside the range of a single byte, so
+; we only ever have to initialize the least significant byte.
+   lda #2 * mathprec
+   sta j
+
+.forj:
+; Point mathop2 to the number beginning at the j'th byte
+; of numbers.
+   clc
+   lda j
+   adc #<numbers
+   sta mathop2
+   lda #$00           ; high byte of j is always zero
+   adc #>numbers
+   sta mathop2 + 1
+
+;
+; for k = 2 * j; k <= 20 * mathprec; k += j
+;
+; k = 2 * j
+; k will never be outside the range of a single byte, so
+; we only ever have to initialize the least significant byte.
+   lda j
+   asl
+   sta k
+.fork:
+
+;
+; Is the number beginning at the j'th byte a factor of the
+; number beginning at the k'th byte?
+;
+
+; Point mathop1 to the number beginning at the k'th byte
+; of numbers.
+   clc
+   lda k
+   adc #<numbers
+   sta mathop1
+   lda #$00         ; next byte of k will always be zero
+   adc #>numbers
+   sta mathop1 + 1
+
+   jsr math_divide
+
+; Is the remainder 0?
+; The remainder will always be less than 10, so we
+; only need to look at the least significant byte.
+   lda remainder
+   bne .nextk
+; Copy the quotient back to the k'th byte of numbers
+; As the quotient will always be within a single byte,
+; we only copy the least significant byte.
+   lda quotient
+   ldx k
+   sta numbers, x
+
+.nextk:
+   clc
+   lda k
+   adc j
+   sta k
+   cmp #20 * mathprec
+   bcc .fork           ; branch if k <  20 * mathprec
+   beq .fork           ; branch if k == 20 * mathprec
+
+.nextj:
+   clc
+   lda j
+   adc #mathprec
+   sta j
+   cmp #10 * mathprec
+   bcc .forj           ; branch if j <  10 * mathprec
+   beq .forj           ; branch if j == 10 * mathprec
+
+;
+; multiply all the numbers from the 2nd to the 20th.
+;
+   lda #<minproduct    ; point mathres and mathop1 to minproduct
+   sta mathop1
+   sta mathres
+   lda #>minproduct
+   sta mathop1 + 1
+   sta mathres + 1
+
+;
+;  for j = 2 * mathprec; j <= 20 * mathprec; j += mathprec
+;
+;  j = 2 * mathprec (will always fit in one byte)
+   lda #2 * mathprec
+   sta j
+.forj2:
+   clc                 ; point mathop2 to the j'th byte of numbers
+   adc #<numbers
+   sta mathop2
+   lda #$00
+   adc #>numbers
+   sta mathop2 + 1
+
+   jsr math_multiply
+
+.nextj2:
+   clc
+   lda j
+   adc #mathprec
+   sta j
+   cmp #21 * mathprec
+   bcc .forj2         ; branch if j < 21 * mathprec
+
+;
+; output answer
+;
+   jsr subclearscreen
+   +print_string .answer
+   +set_param_bcd minproduct, minproductbcd
+   jsr math_bcd
+   +set_param_outputBCD minproductbcd, mathbcdprec
+   jsr sub_outputBCD
+   rts
+
