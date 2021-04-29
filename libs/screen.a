@@ -120,6 +120,7 @@ subprintonechar:
     tya
     adc .currow
     sta .currow
+    lda #$00
     adc .currow + 1
     sta .currow + 1
     ldy #$00
