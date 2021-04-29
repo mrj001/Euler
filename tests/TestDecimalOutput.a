@@ -15,6 +15,8 @@
     !byte 0
 .basend !byte 0, 0
 
+mathbcdprec = $05
+
 !source "../libs/preamble.a"
 !source "../libs/screen.a"
 
@@ -41,13 +43,14 @@
 .expected !scr "expected: 42", 13, 0
 .actual   !scr "actual:   ", 0
 .input=*
-!byte $42, $00
+!byte $42
+!fill mathbcdprec - 1, $00
 
 test1
     +print_label .l1
     +print_label .expected
     +print_label .actual
-    +set_param_outputBCD .input, 2
+    +set_param_outputBCD .input
     jsr sub_outputBCD
     jmp test2
 }
@@ -62,11 +65,12 @@ test1
 .actual   !scr "actual:   ", 0
 .input=*
 !byte $29, $17
+!fill mathbcdprec - 2, $00
 test2:
     +print_label .l2
     +print_label .expected
     +print_label .actual
-    +set_param_outputBCD .input, 2
+    +set_param_outputBCD .input
     jsr sub_outputBCD
     jmp test3
 }
@@ -88,7 +92,7 @@ test3:
     +print_label .l3
     +print_label .expected
     +print_label .actual
-    +set_param_outputBCD .input, 5
+    +set_param_outputBCD .input
     jsr sub_outputBCD
     jmp test4
 }
@@ -110,7 +114,7 @@ test4:
     +print_label .l4
     +print_label .expected
     +print_label .actual
-    +set_param_outputBCD .input, 5
+    +set_param_outputBCD .input
     jsr sub_outputBCD
     rts
 }
