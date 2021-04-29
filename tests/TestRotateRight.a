@@ -18,6 +18,8 @@
 mathprec=$05
 mathbcdprec=$07
 
+!source "../libs/preamble.a"
+!source "../libs/screen.a"
 !source "../libs/arithmetic.a"
 
 ; This macro prints the label for the current test
