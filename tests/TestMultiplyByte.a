@@ -19,6 +19,7 @@ mathprec=4
 mathbcdprec=5
 
 !source "../libs/preamble.a"
+!source "../libs/screen.a"
 !source "../libs/arithmetic.a"
 
 ; This macro prints the label for the current test
