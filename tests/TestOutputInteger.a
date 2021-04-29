@@ -18,8 +18,9 @@
 mathprec=$04
 mathbcdprec=$05
 
+!source "../libs/preamble.a"
+!source "../libs/screen.a"
 !source "../libs/arithmetic.a"
-; !source "../libs/screen.a"
 
 ; This macro prints the label for the current test
 !macro print_label .lbl {
@@ -46,9 +47,9 @@ mathbcdprec=$05
 
 test1
     +print_label .lbl
-    +screen_set_param_outputinteger .a1
+    +math_set_param_output_integer .a1
 
-    jsr screen_outputinteger
+    jsr math_output_integer
 
     ; results to be checked visually by user.
     jmp test2
@@ -65,9 +66,9 @@ test1
 
 test2
     +print_label .lbl
-    +screen_set_param_outputinteger .a2
+    +math_set_param_output_integer .a2
 
-    jsr screen_outputinteger
+    jsr math_output_integer
 
     ; results to be checked visually by user.
     jmp test3
@@ -85,9 +86,9 @@ test2
 
 test3
     +print_label .lbl
-    +screen_set_param_outputinteger .a3
+    +math_set_param_output_integer .a3
 
-    jsr screen_outputinteger
+    jsr math_output_integer
 
     ; results to be checked visually by user.
     rts

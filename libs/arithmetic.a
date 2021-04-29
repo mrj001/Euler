@@ -281,6 +281,54 @@ math_bcd:
    rts
 }  ; end of zone bcd
 
+!zone output_integer {
+!macro math_set_param_output_integer .n {
+   lda #<.n
+   sta mathop1
+   lda #>.n
+   sta mathop1 + 1
+}
+
+;
+; A convenience subroutine for output of
+; an integer.
+;
+; Inputs:
+;  mathop1: points to the integer to output
+;
+; Side Effects:
+;  mathop1 is altered
+;  mathres is altered
+;
+.bcdtmp=*
+!fill mathbcdprec, $00
+
+; A temporary copy for (mathop1) so that
+; we don't destroy the input.
+.tmp=*
+!fill mathprec, $00
+
+math_output_integer:
+   ; copy (mathop1) to .tmp
+   ldy #mathprec - 1
+.copy:
+   lda (mathop1), y
+   sta .tmp, y
+   dey
+   bne .copy
+   lda (mathop1), y
+   sta .tmp
+
+   ; Convert to BCD
+   +set_param_bcd .tmp, .bcdtmp
+   jsr math_bcd
+
+   ; output
+   jsr sub_outputBCD
+
+   rts
+}  ; end zone output_integer
+
 !zone digit_sum {
 !macro math_set_param_digit_sum .op, .res {
    lda #<.op
