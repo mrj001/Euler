@@ -102,7 +102,7 @@ subclearscreen
 
     rts
 
-!zone printonechar {
+; !zone printonechar {
 ;
 ; Output the character in the Accumulator to the current
 ; screen position.  Advance the position by one character.
@@ -116,30 +116,30 @@ subclearscreen
 screen_print_one_char:
     cmp #$0d          ; check for Return
     beq .advance_row  ; if return, goto .advance_row
-    ldy screen.currow       ; Copy the current row pointer to zero page
+    ldy .currow       ; Copy the current row pointer to zero page
     sty tmpaddr
-    ldy screen.currow + 1
+    ldy .currow + 1
     sty tmpaddr + 1
-    ldy screen.curcol
+    ldy .curcol
     sta (tmpaddr), y  ; store the character in the current screen position
     iny
-    sty screen.curcol
-    cpy #screen.screencols  ; have we reached the end of the line?
+    sty .curcol
+    cpy #.screencols  ; have we reached the end of the line?
     bne .done
 .advance_row:
     clc               ; advance to next row
-    lda #screen.screencols
-    adc screen.currow
-    sta screen.currow
+    lda #.screencols
+    adc .currow
+    sta .currow
     lda #$00
-    adc screen.currow + 1
-    sta screen.currow + 1
+    adc .currow + 1
+    sta .currow + 1
     ldy #$00
-    sty screen.curcol
+    sty .curcol
 ; TODO check for end of screen
 .done:
     rts
-}  ; end zone printonechar
+; }  ; end zone printonechar
 
 ; !zone set_basic_cursor {
 ;
