@@ -142,13 +142,11 @@ screen_print_one_char:
 }  ; end zone printonechar
   
 !zone outputBCD {
-!macro set_param_outputBCD .ptr, .bcdprec {
+!macro set_param_outputBCD .ptr {
    ldy #<.ptr
    sty mathres
    ldy #>.ptr
    sty mathres + 1
-   ldy #.bcdprec
-   ; sty mathbcdprec
 }
 
 ; outputs a BCD number, with leading zeroes suppressed

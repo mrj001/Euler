@@ -16,6 +16,8 @@
 
 teststring !scr "hello, world!", 13, "0123456789012345678901234567890123456789third line", 0
 
+mathbcdprec=$05
+
 !source "../libs/preamble.a"
 !source "../libs/screen.a"
 
