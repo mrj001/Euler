@@ -1,0 +1,217 @@
+; Screen routines
+
+!zone screen {
+    .screencols = 40
+    .screenrows = 25
+    .screenstart = $0400
+
+; Start address of current screen row.
+.currow=*
+!word .screenstart
+
+; Column index of current screen column.
+.curcol=*
+!fi 1, 0
+
+; Current character index within the string
+.curchar=*
+!fi 1, 0
+    
+subprint
+    lda #$00         ; set to zero'th char in string
+    sta .curchar
+
+    lda .currow      ; load low-byte of pointer to current screen row
+    sta tmpaddr      ; store it in zero page
+    lda .currow + 1  ; load high-byte of pointer to current screen row
+    sta tmpaddr + 1  ; store it in zero page.
+
+; Print one character.
+.prchar
+    ldy .curchar     ; load current character index
+    lda (straddr), y ; load current character of string
+    beq .end         ; if it is null, goto cleanup
+    cmp #$0d         ; If it is return, go to next screen line
+    beq ++
+
+    ldy .curcol      ; load current screen column
+    sta (tmpaddr),y  ; print character to screen
+    iny              ; move to next column
+    sty .curcol
+    cpy #.screencols ; if we have not reached the right edge of the screen
+    bne .next        ;    goto next loop iteration.
+    
+; Advance to next screen row.
+++  ldy #$00         ; back to column 0
+    sty .curcol
+    lda #.screencols
+    clc              ; Add screen columns to low byte of .currow
+    adc tmpaddr
+    sta tmpaddr
+    bcc .next        ; If there was no carry, go to the next loop iteration
+    inc tmpaddr + 1  ; increment the high byte of .currow
+          ; TODO handle out of rows....
+
+.next
+    inc .curchar     ; increment character index
+    jmp .prchar
+.end
+    lda tmpaddr      ; copy low byte of current screen row pointer
+    sta .currow
+    lda tmpaddr + 1  ; copy high byte of current screen row pointer
+    sta .currow + 1
+    rts
+
+subclearscreen
+; use tmpaddr to point into the screen memory
+    lda #<(.screenstart + $0300)
+    sta tmpaddr
+    lda #>(.screenstart + $0300)
+    sta tmpaddr + 1
+
+    lda #$20     ; equals to "space"
+
+    ; write spaces over last page of the screen
+    ldy #$e8     ; last page of screen only uses $E8 characters
+-   sta (tmpaddr), y
+    dey
+    bne -
+    sta (tmpaddr), y ; fill first byte of the page.
+
+    ; write spaces over the first three pages of the screen
+    ldx #$03
+    ldy #$ff
+--- dec tmpaddr + 1  ; decrement high byte of tmpaddr
+--  sta (tmpaddr), y
+    dey
+    bne --
+    sta (tmpaddr), y ; fill first byte of the page.
+    dey              ; set y to $FF
+    dex
+    bne ---
+
+    ; set current row to screenstart
+    lda #<.screenstart
+    sta .currow
+    lda #>.screenstart
+    sta .currow + 1
+
+    ; set current column to zero
+    lda #$00
+    sta .curcol
+
+    rts
+
+!zone printonechar {
+;
+; Output the character in the Accumulator to the current
+; screen position.  Advance the position by one character.
+;
+; Input: 
+;  The accumulator is to contain the character to print
+;
+; Side Effects:
+;   Changes the content of tmpaddr
+;
+screen_print_one_char:
+    cmp #$0d          ; check for Return
+    beq .advance_row  ; if return, goto .advance_row
+    ldy screen.currow       ; Copy the current row pointer to zero page
+    sty tmpaddr
+    ldy screen.currow + 1
+    sty tmpaddr + 1
+    ldy screen.curcol
+    sta (tmpaddr), y  ; store the character in the current screen position
+    iny
+    sty screen.curcol
+    cpy #screen.screencols  ; have we reached the end of the line?
+    bne .done
+.advance_row:
+    clc               ; advance to next row
+    lda #screen.screencols
+    adc screen.currow
+    sta screen.currow
+    lda #$00
+    adc screen.currow + 1
+    sta screen.currow + 1
+    ldy #$00
+    sty screen.curcol
+; TODO check for end of screen
+.done:
+    rts
+}  ; end zone printonechar
+  
+!zone outputBCD {
+!macro set_param_outputBCD .ptr, .bcdprec {
+   ldy #<.ptr
+   sty mathres
+   ldy #>.ptr
+   sty mathres + 1
+   ldy #.bcdprec
+   ; sty mathbcdprec
+}
+
+; outputs a BCD number, with leading zeroes suppressed
+; Memory at the following labels is used as input
+;    mathres:  pointer to the Binary-Coded Decimal number
+;    mathbcdprec: contains the number of bytes in the BCD number
+; The BCD number is in little endian format
+.zero_suppress=*
+!byte $00
+.tx=*
+!byte $00
+.ty=*
+!byte $00
+
+sub_outputBCD:
+    ldy #mathbcdprec - 1 ; load y with index of MSB
+    lda #$00             ; suppress leading zeroes
+    sta .zero_suppress
+
+    ; output high nybble
+.dohi:
+    lda (mathres), y    ; load current byte
+    lsr                 ; isolate high 4 bits
+    lsr
+    lsr
+    lsr
+    ldx .zero_suppress  ; check for leading zero suppression
+    bne .outhi          ; if not zero, it must be output
+    cmp #$00            ; Is A == 0?
+    beq .dolo           ; A == 0 && suppressing...
+    inc .zero_suppress  ; no longer suppressing zeroes
+
+.outhi:
+    ora #$30            ; convert Binary-Coded digit to C64 screen code
+    stx .tx
+    sty .ty
+    jsr screen_print_one_char
+    ldy .ty
+    ldx .tx
+
+.dolo:
+    lda (mathres), y    ; load current byte
+    and #$0F            ; isolate low-order 4 bits
+    ldx .zero_suppress  ; check for leading zero suppression
+    bne .outlo          ; branch if not suppressing
+    cmp #$00            ; Is A == 0?
+    beq .donebyte       ; A == 0 && suppressing...
+    inc .zero_suppress  ; no longer suppressing zeroes
+
+.outlo
+    ora #$30            ; convert Binary-Coded digit to C64 screen code
+    stx .tx
+    sty .ty
+    jsr screen_print_one_char
+    ldy .ty
+    ldx .tx
+
+.donebyte
+   dey                  ; next byte
+   bpl .dohi
+
+   rts
+    
+}  ; end zone outputBCD
+}  ; end zone screen
+
