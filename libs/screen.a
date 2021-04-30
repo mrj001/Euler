@@ -205,11 +205,13 @@ screen_set_basic_cursor:
    sty mathres + 1
 }
 
-; outputs a BCD number, with leading zeroes suppressed
-; Memory at the following labels is used as input
-;    mathres:  pointer to the Binary-Coded Decimal number
-;    mathbcdprec: contains the number of bytes in the BCD number
+;
+; Outputs a BCD number, with leading zeroes suppressed
 ; The BCD number is in little endian format
+;
+; Inputs:
+;    mathres:  pointer to the Binary-Coded Decimal number
+;
 .zero_suppress=*
 !byte $00
 .tx=*
@@ -264,6 +266,12 @@ sub_outputBCD:
    dey                  ; next byte
    bpl .dohi
 
+   lda .zero_suppress   ; Check if we are still suppressing zeroes
+   bne .return          ; branch if the number was not zero
+   lda #$30             ; print zero
+   jsr screen_print_one_char
+
+.return:
    rts
     
 }  ; end zone outputBCD
