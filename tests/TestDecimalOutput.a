@@ -116,5 +116,27 @@ test4:
     +print_label .actual
     +set_param_outputBCD .input
     jsr sub_outputBCD
-    rts
+    jmp test5
 }
+
+!zone test5 {
+;
+; Test 5: Output a zero
+;
+.l5 !scr 13, "five: ", 13, 0
+.expected !scr "expected: 0", 13, 0
+.actual   !scr "actual:   ", 0
+.input=*
+!byte $00, $00, $00, $00, $00
+test5:
+    +print_label .l5
+    +print_label .expected
+    +print_label .actual
+    +set_param_outputBCD .input
+    jsr sub_outputBCD
+}
+
+; clean up & exit
+   jsr screen_set_basic_cursor
+   rts
+
