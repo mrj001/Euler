@@ -129,6 +129,62 @@ subprintonechar:
 .done:
     rts
 
+; !zone set_basic_cursor {
+;
+; Sets the basic cursor from .currow and .curcol
+;
+; Inputs:
+;  .currow & .curcol
+;
+; Outputs:
+;  none
+;
+.calcrow=*
+!byte $00, $00
+
+screen_set_basic_cursor:
+; copy .curcol to basic
+   lda .curcol
+   sta $d3
+
+; Subtract the start of screen memory from the .currow
+; pointer to obtain the offset within the screen.
+   sec
+   lda .currow
+   sbc #<.screenstart
+   sta .calcrow
+   lda .currow + 1
+   sbc #>.screenstart
+   sta .calcrow + 1
+
+; Divide .calcrow by 8
+   lsr .calcrow + 1
+   ror .calcrow
+   lsr .calcrow + 1
+   ror .calcrow
+   lsr .calcrow + 1
+   ror .calcrow
+
+; The scaled offset will now fit in a single byte,
+; which will be in .calcrow.
+; Count the rows by repeated subtraction of 5.
+; Use X to count the rows.
+   ldx #$00
+   lda .calcrow
+   beq .store_basic_cursor
+   sec
+.count:
+   inx
+   sbc #$05
+   bne .count
+
+; copy the number of the row to BASIC
+.store_basic_cursor:
+   stx $d6
+
+   rts
+; }  ; end zone set_basic_cursor
+
 !zone outputBCD {
 !macro set_param_outputBCD .ptr {
    ldy #<.ptr
