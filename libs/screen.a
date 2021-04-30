@@ -102,32 +102,44 @@ subclearscreen
 
     rts
 
-; output the character in the Accumulator to the current
+!zone printonechar {
+;
+; Output the character in the Accumulator to the current
 ; screen position.  Advance the position by one character.
-; Changes the content of tmpaddr
-subprintonechar:
-    ldy .currow       ; Copy the current row pointer to zero page
+;
+; Input: 
+;  The accumulator is to contain the character to print
+;
+; Side Effects:
+;   Changes the content of tmpaddr
+;
+screen_print_one_char:
+    cmp #$0d          ; check for Return
+    beq .advance_row  ; if return, goto .advance_row
+    ldy screen.currow       ; Copy the current row pointer to zero page
     sty tmpaddr
-    ldy .currow + 1
+    ldy screen.currow + 1
     sty tmpaddr + 1
-    ldy .curcol
+    ldy screen.curcol
     sta (tmpaddr), y  ; store the character in the current screen position
     iny
-    sty .curcol
-    cpy #.screencols  ; have we reached the end of the line?
+    sty screen.curcol
+    cpy #screen.screencols  ; have we reached the end of the line?
     bne .done
+.advance_row:
     clc               ; advance to next row
-    tya
-    adc .currow
-    sta .currow
+    lda #screen.screencols
+    adc screen.currow
+    sta screen.currow
     lda #$00
-    adc .currow + 1
-    sta .currow + 1
+    adc screen.currow + 1
+    sta screen.currow + 1
     ldy #$00
-    sty .curcol
+    sty screen.curcol
 ; TODO check for end of screen
 .done:
     rts
+}  ; end zone printonechar
 
 ; !zone set_basic_cursor {
 ;
@@ -184,7 +196,7 @@ screen_set_basic_cursor:
 
    rts
 ; }  ; end zone set_basic_cursor
-
+  
 !zone outputBCD {
 !macro set_param_outputBCD .ptr {
    ldy #<.ptr
@@ -227,7 +239,7 @@ sub_outputBCD:
     ora #$30            ; convert Binary-Coded digit to C64 screen code
     stx .tx
     sty .ty
-    jsr subprintonechar
+    jsr screen_print_one_char
     ldy .ty
     ldx .tx
 
@@ -244,7 +256,7 @@ sub_outputBCD:
     ora #$30            ; convert Binary-Coded digit to C64 screen code
     stx .tx
     sty .ty
-    jsr subprintonechar
+    jsr screen_print_one_char
     ldy .ty
     ldx .tx
 
