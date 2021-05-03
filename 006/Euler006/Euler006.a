@@ -1,0 +1,233 @@
+;@com.wudsn.ide.asm.hardware=C64
+!to "Euler006.prg", cbm 
+!cpu 6510
+!sl "Euler006.labels"
+
+; BASIC program: (Where run is replaced by its address.)
+;   10 SYS run
+* = $0801
+    !byte <.basend,>.basend,$0A,$00  ; line 10
+    !byte $54, $49, $24, $b2, $22    ; TI$="000000":
+    !fill $06, $30
+    !byte $22, $3a
+    !byte $9e                        ; Sys keyword
+    !byte (run/1000) % 10 + '0'      ; Address for SYS
+    !byte (run/100) % 10 + '0'   
+    !byte (run/10) % 10 + '0' 
+    !byte run % 10 + '0' 
+    !byte $3a, $99, $20, $54, $49    ; :PRINT TI
+    !byte 0
+.basend !byte 0, 0
+
+mathprec=$04
+mathbcdprec=$05
+
+!src "preamble.a"
+!src "screen.a"
+!src "arithmetic.a"
+
+; This macro prints a string
+!macro print_string .str {
+   lda #<.str
+   sta+1 straddr
+   lda #>.str
+   sta+1 straddr + 1
+   jsr subprint
+}
+
+.forstr    !scr "for ", 0
+.answerstr !scr ", the answer is ", 0
+
+; The sum of the squares
+sumofsquares=*
+!fill mathprec, $00
+
+; The sum of the numbers
+sum=*
+!fill mathprec, $00
+
+; loop counter
+j=*
+!fill mathprec, $00
+
+; space to calculate the square of j
+jsquare=*
+!fill mathprec, $00
+
+; loop limit
+jul=*
+!byte $64
+!fill mathprec - 1, $00
+
+run:
+   jsr subclearscreen
+   
+   ; calculate for 10
+   ; This is a test to make sure we get the same answer
+   ; as given in the problem statement.
+   lda #$0a
+   sta jul
+   jsr sub_calculate
+   jsr sub_output
+   
+   ; calculate for 100
+   lda #$64
+   sta jul
+   jsr sub_calculate
+   jsr sub_output
+   rts
+   
+;
+; Outputs "For %d, the answer is %d"
+;  where the first "%d" is jul
+;  and the second %d is jsquare
+;
+; Inputs:
+;  jul: first number to output
+;  jsquare: second number to output
+;
+; Outputs:
+;  string on screen
+;
+; Side Effects:
+;  straddr is altered
+;  mathop1 is altered
+;  mathres is altered
+;
+.bcdtmp=*
+!fill mathbcdprec, $00
+
+sub_output:
+   +print_string .forstr
+   
+   +set_param_bcd jul, .bcdtmp
+   jsr math_bcd
+   jsr sub_outputBCD
+   
+   +print_string .answerstr
+   
+   +set_param_bcd jsquare, .bcdtmp
+   jsr math_bcd
+   jsr sub_outputBCD
+   
+   lda #$0d
+   jsr screen_print_one_char
+   rts
+
+;
+; Calculates the square of the sum minus the sum of the squares
+; for numbers up to jul
+;
+; Inputs:
+;  jul: The limit of the calculation
+;
+; Outputs:
+;  The answer is returned in jsquare.
+;
+; Side Effects:
+;  mathop1, mathop2, and mathres are all altered.
+;
+sub_calculate:
+; init variables to zero
+   lda #$00
+   ldy #mathprec - 1
+.initloop:
+   sta sumofsquares, y
+   sta sum, y
+   sta j, y
+   dey
+   bpl .initloop
+   
+   ; point mathop1 to j
+   lda #<j
+   sta mathop1
+   lda #>j
+   sta mathop1 + 1
+   
+   ; point mathres to jsquare
+   lda #<jsquare
+   sta mathres
+   lda #>jsquare
+   sta mathres + 1
+
+; for j = 1; j <= 100; j ++
+   lda #$01
+   sta j
+.forj:
+   ; sum += j
+   ldy #$00
+   ldx #mathprec
+   clc
+.addsum:
+   lda j, y
+   adc sum, y
+   sta sum, y
+   iny
+   dex
+   bne .addsum
+   
+   ; square j
+   lda #<j
+   sta mathop2
+   lda #>j
+   sta mathop2 + 1
+   jsr math_multiply
+   
+   ; sumofsquares += jsquare
+   ldy #$00
+   ldx #mathprec
+   clc
+.addsquares:
+   lda jsquare, y
+   adc sumofsquares, y
+   sta sumofsquares, y
+   iny
+   dex
+   bne .addsquares
+
+.nextj:
+; j += 1
+   sec
+   ldy #$00
+   ldx #mathprec
+.incj:
+   lda #$00
+   adc j, y
+   sta j, y
+   iny
+   dex
+   bne .incj
+   ; test j <= 100
+   lda #<jul
+   sta mathop2
+   lda #>jul
+   sta mathop2 + 1
+   jsr math_compare
+   bmi .forj           ; branch if j <  jul
+   beq .forj           ; branch if j == jul
+   
+   ; Square the sum
+   ; jsquare = sum * .sum
+   lda #<sum
+   sta mathop1
+   sta mathop2
+   lda #>sum
+   sta mathop1 + 1
+   sta mathop2 + 1
+   jsr math_multiply
+   
+   ; Square of the sum minus the sum of Squares
+   ; jsquare -= .sumofsquares
+   sec
+   ldy #$00
+   ldx #mathprec
+.subtract
+   lda jsquare, y
+   sbc sumofsquares, y
+   sta jsquare, y
+   iny
+   dex
+   bne .subtract
+   rts
+   
+   
