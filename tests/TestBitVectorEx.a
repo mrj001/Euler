@@ -1,0 +1,175 @@
+;@com.wudsn.ide.asm.hardware=C64
+!to "TestBitVectorEx.prg", cbm 
+!cpu 6510
+!sl "TestBitVectorEx.labels"
+
+; BASIC program: (Where .run is replaced by its address.)
+;   10 SYS .run
+* = $0801
+    !byte <.basend,>.basend,$0A,$00,$9e
+    !byte .run/10000 + '0'    
+    !byte .run/1000 % 10 + '0'    
+    !byte .run/100 % 10 + '0'   
+    !byte .run/10 % 10 + '0' 
+    !byte .run % 10 + '0' 
+    !byte 0
+.basend !byte 0, 0
+
+mathprec=$04
+mathbcdprec=$05
+
+!source "../libs/preamble.a"
+!source "../libs/screen.a"
+!source "../libs/bitvectorex.a"
+
+; This macro prints the label for the current test
+!macro print_string .lbl {
+    lda #<.lbl
+    sta+1 straddr
+    lda #>.lbl
+    sta+1 straddr + 1
+    jsr subprint
+}
+
+pass !scr "pass", 13, 0
+fail !scr "fail", 13, 0
+
+;
+; Begin test execution here
+;
+.run:
+   jsr subclearscreen
+   jmp test1
+
+!zone test1 {
+;
+; Test 1: Initialize the Bit Vector to $ff
+;   and confirm certain bits are set.
+;  
+.lbl !scr "one:", 0
+
+test1:
+   +print_string .lbl
+
+   ldx #$ff
+   jsr bvx_initialize
+
+; Confirm last bit is set
+   lda #$03
+   sta bitindex + 2
+   lda #$ff
+   sta bitindex + 1
+   sta bitindex
+   jsr bvx_get_bit
+   beq .fail
+
+; Confirm first bit is set
+   lda #$00
+   sta bitindex
+   sta bitindex + 1
+   sta bitindex + 2
+   jsr bvx_get_bit
+   beq .fail
+   
+; Confirm a bit in the middle is set
+   lda #$01
+   sta bitindex + 2
+   lda #$f4
+   sta bitindex + 1
+   lda #$71
+   sta bitindex
+   jsr bvx_get_bit
+   beq .fail
+
+.pass:
+   +print_string pass
+   jmp test2
+
+.fail:
+   +print_string fail
+
+   jmp test2
+} ; end of zone test1
+
+!zone test2 {
+;
+; Test 2: Confirm Set, Get, and Clear of various bits.
+;
+.lbl !scr "two:", 0
+
+test2:
+   +print_string .lbl
+;
+; Clear bit 0 & confirm
+;
+   lda #$00
+   sta bitindex
+   sta bitindex + 1
+   sta bitindex + 2
+   jsr bvx_clear_bit
+
+; confirm that bit 0 is clear
+   jsr bvx_get_bit
+   bne .fail              ; Test fails if the bit is set
+
+; Confirm that bit 1 is set
+   lda #$01
+   sta bitindex
+   jsr bvx_get_bit
+   beq .fail              ; Test fails if the bit is clear
+
+;
+; Set bit 0 & confirm
+;
+   lda #$00
+   sta bitindex
+   sta bitindex + 1
+   sta bitindex + 2
+   jsr bvx_set_bit
+
+; confirm that bit 0 is set
+   jsr bvx_set_bit
+   beq .fail              ; Test fails if the bit is clear
+
+;
+; Clear bit 513 (a bit inside a byte)
+;
+   lda #$01
+   sta bitindex
+   lda #$02
+   sta bitindex + 1
+   jsr bvx_clear_bit
+
+; Confirm bit 512 is set
+   lda #$00
+   sta bitindex
+   sta bitindex + 2
+   lda #$02
+   sta bitindex + 1
+   jsr bvx_get_bit
+   beq .fail              ; Test fails if bit 512 is clear
+
+; Confirm bit 514 is set
+   lda #$02
+   sta bitindex
+   sta bitindex + 1
+   jsr bvx_get_bit
+   beq .fail              ; Test fails if bit 514 is clear
+
+; Confirm bit 513 is clear
+   lda #$01
+   sta bitindex
+   lda #$02
+   sta bitindex + 1
+   jsr bvx_get_bit
+   bne .fail              ; Test fails if bit 512 is set
+
+.pass
+   +print_string pass
+   rts
+
+.fail
+   +print_string fail
+
+   rts
+}   ; end of zone test2
