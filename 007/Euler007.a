@@ -1,0 +1,205 @@
+;@com.wudsn.ide.asm.hardware=C64
+!to "Euler007.prg", cbm 
+!cpu 6510
+!sl "Euler007.labels"
+
+; BASIC program: (Where run is replaced by its address.)
+;   10 SYS run
+* = $0801
+    !byte <.basend,>.basend,$0A,$00  ; line 10
+    !byte $54, $49, $24, $b2, $22    ; TI$="000000":
+    !fill $06, $30
+    !byte $22, $3a
+    !byte $9e                        ; Sys keyword
+    !byte (run/1000) % 10 + '0'      ; Address for SYS
+    !byte (run/100) % 10 + '0'
+    !byte (run/10) % 10 + '0'
+    !byte run % 10 + '0'
+    !byte $3a, $99, $20, $54, $49    ; :PRINT TI
+    !byte 0
+.basend !byte 0, 0
+
+mathprec=$03
+mathbcdprec=$04
+
+!src "preamble.a"
+!src "screen.a"
+!src "arithmetic.a"
+!src "bitvectorex.a"
+
+; This macro prints a string
+!macro print_string .str {
+    lda #<.str
+    sta+1 straddr
+    lda #>.str
+    sta+1 straddr + 1
+    jsr subprint
+}
+  
+.answer !scr "the answer is ", 0
+.sieve  !scr "running sieve", 13, 0
+.counting !scr "counting primes", 13, 0
+
+; loop counter
+.j=*
+!fill mathprec, $00
+
+;The extended bit vector can address 262,144 bits.
+; loop limit: 512 = sqrt(262,144)
+.jul=*
+!byte $00, $02
+!fill mathprec - 2, $00
+
+;---------------------------------------------------
+; Sieve of Eratosthenes in a bit vector.
+; The clear bits indicate composite numbers.
+;---------------------------------------------------
+run:
+   jsr subclearscreen
+   +print_string .sieve
+   
+   ldx #$ff
+   jsr bvx_initialize
+
+; for .j = 2; j <= jul; j = next prime
+   lda #$02
+   sta .j
+   lda #$00
+   sta .j + 1
+   sta .j + 2
+
+.forj:
+; for bitindex = 2 * .j; bitindex < 262,144; bitindex += .j
+   lda .j
+   asl
+   sta bitindex
+   lda .j + 1
+   rol
+   sta bitindex + 1
+   lda .j + 2
+   rol
+   sta bitindex + 2
+   
+; mark bitindex as composite by clearing its bit.
+.form:
+   jsr bvx_clear_bit
+
+.nextm:
+; bitindex += .j
+   clc
+   lda bitindex
+   adc .j
+   sta bitindex
+   lda bitindex + 1
+   adc .j + 1
+   sta bitindex + 1
+   lda bitindex + 2
+   adc .j + 2
+   sta bitindex + 2
+
+; test .bitindex < 262,144 (The length of the bitvector)
+; branch until bit 19 of bitindex is set
+   and #$04
+   beq .form
+
+.nextj:
+; do
+;    .j ++
+; while .j is composite and .j <= .jul
+   clc
+   lda .j
+   adc #$01
+   sta .j
+   lda .j + 1
+   adc #$00
+   sta .j + 1
+   ; As .jul is 512, we need not be concerned with the 
+   ; 3rd byte.
+
+; Is .j <= .jul
+   sec
+   lda .j
+   sbc .jul
+   lda .j + 1
+   sbc .jul + 1
+   beq .testjcomposite   ; branch if .j == .jul 
+   bpl .donesieve        ; branch if .j >= .jul (i.e. done)
+
+; Is .j composite?
+.testjcomposite:
+   lda .j
+   sta bitindex
+   lda .j + 1
+   sta bitindex + 1
+   lda .j + 2
+   sta bitindex + 2
+   jsr bvx_get_bit
+   beq .nextj            ; branch if .j is composite
+   jmp .forj
+
+.donesieve:
+;--------------------------------------------------------------------
+; Count primes until we find the 10,001th prime
+;--------------------------------------------------------------------
+   +print_string .counting
+; bitindex = 2
+   lda #$02
+   sta bitindex
+   lda #$00
+   sta bitindex + 1
+   sta bitindex + 2
+   
+; j = 0  ; We'll use j to count primes
+   sta .j
+   sta .j + 1
+   sta .j + 2
+   
+.countprimes:
+; Is bitindex prime?
+   jsr bvx_get_bit
+   beq .nextbitindex     ; branch if composite
+   
+; Increment the count of primes.
+; We will only ever need 2 bytes for this.
+   sec
+   lda #$00
+   adc .j
+   sta .j
+   lda #$00
+   adc .j + 1
+   sta .j + 1
+
+; Is j == 10,001?
+   lda .j
+   cmp #$11    ; low byte of 10,001
+   bne .nextbitindex
+   lda .j + 1
+   cmp #$27     ; high byte of 10,001
+   beq .done
+
+.nextbitindex:   
+; increment bitindex
+; This will require all 3 bytes
+   sec 
+   lda #$00
+   adc bitindex
+   sta bitindex
+   lda #$00
+   adc bitindex + 1
+   sta bitindex + 1
+   lda #$00
+   adc bitindex + 2
+   sta bitindex + 2
+   
+   jmp .countprimes    ; assumes that we will definitely find the answer
+
+.done:
+   +print_string .answer
+
+   +math_set_param_output_integer bitindex
+   jsr math_output_integer
+
+   rts
+
+;
+

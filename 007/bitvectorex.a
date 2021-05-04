@@ -1,0 +1,173 @@
+; Extended Bit Vector routines
+; This Bit Vector uses 18-bit addresses to address
+; up to 262,144 bits (32 kilobytes).
+
+!zone bitvectorex {
+; Location of the Bit Vector in memory
+; Note that these routines simply assume that we own
+; 32k of memory beginning at this address
+.bitvector= $2000
+
+; These three bytes will contain the bit index to be
+; operated on.
+bitindex=*
+!fill 3, $00
+
+; Contains the index of the byte containing the desired
+; bit.
+.byteindex=*
+!fill 3, $00
+
+; Contains the value of the specified bit within the 
+; byte.
+.bitflag=*
+!byte $00
+
+; This is a lookup table for converting a 3-bit 
+; bit index (within a byte) of a bit to the value
+; of that bit.
+.bitlut=*
+!byte $01
+!byte $02
+!byte $04
+!byte $08
+!byte $10
+!byte $20
+!byte $40
+!byte $80
+
+;
+; Initialize the entire Bit Vector to the value given 
+; in X.
+;
+; Inputs:
+;  X: the value to store in each byte.
+;    This will most commonly be $00 or $ff
+;
+bvx_initialize:
+   lda #<.bitvector
+   sta .ptr
+   lda #>.bitvector
+   sta .ptr + 1
+
+.outerloop:
+   txa
+   ldy #$00
+.innerloop:
+.ptr = * + 1           ; pointer to current address
+   sta $2000, Y
+   iny
+   bne .innerloop
+
+   inc .ptr + 1        ; increment address to next page
+   lda .ptr + 1
+   cmp #$A0
+   bcc .outerloop      ; branch if A <  $A0 (unsigned)
+   beq .outerloop      ; branch if A == $A0
+
+   rts
+
+;
+; This helper subroutine parses the bit index into
+; its parts.
+;
+; Inputs:
+;  bitindex: index of the desired bit
+;
+; Outputs:
+;  .byteindex: the index of the byte which contains the bit
+;  .bitflag:   a value which can be ANDed with the byte to 
+;              isolate the desired bit.
+;  tmpaddr:   the address of the indexed byte.
+;
+; Side Effects: 
+;  tmpaddr is altered
+;
+.parsearg:
+; Copy the given bit index to byte index
+   lda bitindex + 2
+   sta .byteindex + 2
+   lda bitindex + 1
+   sta .byteindex + 1
+   lda bitindex
+   sta .byteindex
+
+   and #$07          ; Isolate the index of the bit within the byte
+   tax
+   lda .bitlut, x    ; convert to a bit flag
+   sta .bitflag
+
+; convert the bit index to a byte index by 
+; dividing by 8.
+   ldx #$03
+.divide8:
+   lsr .byteindex + 2
+   ror .byteindex + 1
+   ror .byteindex
+   dex
+   bne .divide8
+
+; Convert the byte index to a byte address by
+; adding the start address of the bit vector
+   clc
+   lda .byteindex
+   adc #<.bitvector
+   sta tmpaddr
+   lda .byteindex + 1
+   adc #>.bitvector
+   sta tmpaddr + 1
+   
+   rts
+
+;
+; Sets the specified bit in the Bit Vector
+;
+; Inputs:
+;  bitindex: the index of the bit to set
+;
+bvx_set_bit:
+   jsr .parsearg
+
+   ldy #$00
+   lda (tmpaddr), y
+   ora .bitflag
+   sta (tmpaddr), y
+
+   rts
+
+;
+; Clears the specified bit in the Bit Vector
+;
+; Inputs:
+;  bitindex: the index of the bit to clear
+;
+bvx_clear_bit:
+   jsr .parsearg
+
+   ldy #$00
+   lda .bitflag
+   eor #$ff
+   and (tmpaddr), y
+   sta (tmpaddr), y
+
+   rts
+
+;
+; Gets the specified bit in the Bit Vector
+;
+; Inputs:
+;  bitindex: the index of the bit to return
+;
+; Outputs:
+;  The Z flag will be set to the value of the bit.
+;
+bvx_get_bit:
+   jsr .parsearg
+
+   ldy #$00
+   lda .bitflag
+   and (tmpaddr), y
+
+   rts
+}
+
