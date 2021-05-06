@@ -140,6 +140,18 @@ screen_print_one_char:
 .done:
     rts
 ; }  ; end zone printonechar
+  
+screen_new_line:
+    clc               ; advance to next row
+    lda #.screencols
+    adc .currow
+    sta .currow
+    lda #$00
+    adc .currow + 1
+    sta .currow + 1
+    ldy #$00
+    sty .curcol
+    rts
 
 ; !zone set_basic_cursor {
 ;
