@@ -45,7 +45,7 @@ ten=*
 ; If they are equal the Z flag will be set 
 ; after execution; otherwise the Z flag will be cleared.
 math_isequal:
-    lda+1 #mathprec ; load count of bytes per integer
+    lda #mathprec   ; load count of bytes per integer
     tay             ; y will index the bytes of each integer
     dey             ; y should be zero-based.
 .nextdigit
