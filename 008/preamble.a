@@ -1,0 +1,37 @@
+;
+; Zero Page Memory map
+;
+!ifndef __PREAMBLE {
+__PREAMBLE = $01
+
+; two bytes to use for a temporary address
+tmpaddr = $02
+
+; two bytes to pass a pointer to a string to the print subroutine
+straddr = $04
+
+; pointers to math operands
+mathop1 = $07   ; pointer to first operand
+mathop2 = $09   ; pointer to second operand
+mathres = $0B   ; pointer to result
+
+
+
+;
+; Constants
+;
+; You must define mathprec prior to including other source files
+; mathprec = $42  ; number of bytes in an integer
+
+; number of bytes needed for BCD representation of integer
+; Note: this is a function of mathprec.  For example:
+; mathprec  bcd
+;   1        2
+;   2        3
+;   4        5
+;   8        10
+;  66        79
+; You must define mathbcdprec prior to including other source files
+; mathbcdprec = $4f
+}
+
