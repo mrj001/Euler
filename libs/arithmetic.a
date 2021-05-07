@@ -105,7 +105,7 @@ math_compare:
 
 !zone add {
 ; This macro sets parameters for the math_add subroutine.
-!macro set_param_add .a1, .a2, .sum {
+!macro math_set_param_add .a1, .a2, .sum {
    lda #<.a1         ; copy pointer for first addend
    sta mathop1
    lda #>.a1

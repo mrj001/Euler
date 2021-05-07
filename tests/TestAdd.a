@@ -92,7 +92,7 @@ fail !scr "fail", 13, 0
 
 test1
     +print_label .l1
-    +set_param_add .a1, .a2, .actualsum
+    +math_set_param_add .a1, .a2, .actualsum
 
     jsr math_add
 
@@ -117,7 +117,7 @@ test1
 
 test2
     +print_label .l2
-    +set_param_add .b1, .b2, .actualsum2
+    +math_set_param_add .b1, .b2, .actualsum2
 
     jsr math_add
 
@@ -140,7 +140,7 @@ test2
 
 test3
     +print_label .l3
-    +set_param_add .c1, .c2, .actualsum3
+    +math_set_param_add .c1, .c2, .actualsum3
 
     jsr math_add       ; overflow is expected
 
