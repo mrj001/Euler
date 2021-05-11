@@ -1,0 +1,247 @@
+;@com.wudsn.ide.asm.hardware=C64
+!to "Euler009.prg", cbm 
+!cpu 6510
+!sl "Euler009.labels"
+
+; BASIC program: (Where run is replaced by its address.)
+;   10 SYS run
+* = $0801
+    !byte <.basend,>.basend,$0A,$00  ; line 10
+    !byte $54, $49, $24, $b2, $22    ; TI$="000000":
+    !fill $06, $30
+    !byte $22, $3a
+    !byte $9e                        ; Sys keyword
+    !byte (run/1000) % 10 + '0'      ; Address for SYS
+    !byte (run/100) % 10 + '0'
+    !byte (run/10) % 10 + '0'
+    !byte run % 10 + '0'
+    !byte $3a, $99, $20, $54, $49    ; :PRINT TI
+    !byte 0
+.basend !byte 0, 0
+
+mathprec=$04
+mathbcdprec=$05
+
+!src "preamble.a"
+!src "screen.a"
+!src "arithmetic.a"
+
+; This macro prints a string
+!macro print_string .str {
+    lda #<.str
+    sta+1 straddr
+    lda #>.str
+    sta+1 straddr + 1
+    jsr subprint
+}
+  
+.answer !scr "the answer is ", 0
+.strfail !scr "did not find answer", 0
+
+; A pythagorean triple satisfies:
+; a*a + b*b = c*c
+; where a, b, and c are all positive integers
+
+; Properties of a, b, c (from Wikipedia):
+; one of a or b must be odd (we'll use a).
+; b must be a multiple of 4
+; c must be of the form 4n + 1 
+;   (and consequently c*c must also be of the form 4n + 1)
+
+; The problem statement requires that a, b, & c satisfy:
+;  a + b + c = 1000
+
+a=*
+!fill mathprec, $00
+
+asquare=*
+!fill mathprec, $00
+
+b=*
+!fill mathprec, $00
+
+bsquare=*
+!fill mathprec, $00
+
+bmax=*
+!fill mathprec, $00
+
+; A space for calculating a*a + b*b
+a2plusb2=*
+!fill mathprec, $00
+
+c=*
+!fill mathprec, $00
+
+csquare=*
+!fill mathprec, $00
+
+.three=*
+!byte $03
+!fill mathprec - 1, $00
+
+run:
+   jsr subclearscreen
+   
+; init a, b, c
+   lda #$00
+   ldy #mathprec - 1
+.initabc:
+   sta a, y
+   sta b, y
+   sta c, y
+   dey
+   bne .initabc
+   sta c              ; c = 0
+   sta b              ; b = 0
+   lda #$03           ; a = 3
+   sta a
+
+.loopa:
+; while true
+; Since:
+;  1) a + b + c = 1000
+;  2) a + b >= c        (otherwise they can't be a triangle)
+;  3) a < c             (Hypoteneuse must be the longest side)
+;  4) b < c
+;  5) a + b < 2c        (Combining 3 & 4)
+; then:
+;  A) b < (1000 - a) / 2
+;  B) c >= (1000 - a) / 2
+;  C) b >= (500 - 3 * a / 2)
+
+; calculate a * a
+   +math_set_param_multiply a, a, asquare
+   jsr math_multiply
+   
+; calculate bmax = (1000 - a) / 2
+; bmax = 1000 - a
+   sec
+   lda #$e8
+   sbc a
+   sta bmax
+   lda #$03
+   sbc a + 1
+   ; don't need to store A in (bmax + 1) as we're about to 
+   ; modify it and store it.
+; bmax /= 2
+   lsr
+   sta bmax + 1
+   lda bmax
+   ror
+   sta bmax
+   
+; b = 4
+   ldy #mathprec - 1
+   lda #$00
+-  sta b, y
+   dey
+   bne -
+   lda #$04
+   sta b   
+   
+.loopb:
+; calculate b * b
+   +math_set_param_multiply b, b, bsquare
+   jsr math_multiply
+   
+; calculate c = 1000 - a - b
+; c = 1000 - a
+; 1000 == $3e8
+   sec
+   lda #$e8
+   sbc a
+   sta c
+   lda #$03
+   sbc a + 1
+   sta c + 1
+   
+; c = 1000 - a - b
+   sec
+   lda c
+   sbc b
+   sta c
+   lda c + 1
+   sbc b + 1
+   sta c + 1
+   
+; calculate c squared
+   +math_set_param_multiply c, c, csquare
+   jsr math_multiply
+   
+; Does a * a + b * b == c * c???
+   +math_set_param_add asquare, bsquare, a2plusb2
+   jsr math_add
+   
+   lda #<a2plusb2
+   sta mathop1
+   lda #>a2plusb2
+   sta mathop1 + 1
+   lda #<csquare
+   sta mathop2
+   lda #>csquare
+   sta mathop2 + 1
+   jsr math_isequal
+   beq .foundtriple    ; branch if equal
+
+.nextb:
+; b += 4
+   clc
+   lda b
+   adc #$04
+   sta b
+   lda b + 1
+   adc #$00
+   sta b + 1
+; Is b <= bmax
+   lda #<b
+   sta mathop1
+   lda #>b
+   sta mathop1 + 1
+   lda #<bmax
+   sta mathop2
+   lda #>bmax
+   sta mathop2 + 1
+   jsr math_compare
+   beq +              ; continue loop b if b == bmax
+   bpl .nexta         ; exit loop b if b > bmax
++  jmp .loopb
+   
+.nexta:
+; a += 2
+   clc
+   lda a
+   adc #$02
+   sta a
+   lda a + 1
+   adc #$00
+   sta a + 1
+; Is a < 500?
+; Note this could likely be more tightly constrained.
+   sec
+   lda a
+   sbc #$f4
+   lda a + 1
+   sbc #$1f
+   bpl .fail     ; branch if a >= 500
+   jmp .loopa
+   
+; If we come out of the loop here, we
+; have failed to find a solution.
+.fail:
+   +print_string .strfail
+   rts
+
+.foundtriple:
+; calculate a * b * c
+; we'll re-use asquare for this product
+   +math_set_param_multiply a, b, asquare
+   jsr math_multiply
+   +math_set_param_multiply asquare, c, asquare
+   jsr math_multiply
+
+   +print_string .answer
+   ; mathop1 is already pointing to asquare
+   jsr math_output_integer
+   rts
+   
