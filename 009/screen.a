@@ -205,6 +205,9 @@ screen_set_basic_cursor:
 ; copy the number of the row to BASIC
 .store_basic_cursor:
    stx $d6
+   ldy $d3
+   clc
+   jsr $fff0   ; set cursor position
 
    rts
 ; }  ; end zone set_basic_cursor

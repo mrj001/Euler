@@ -230,7 +230,7 @@ run:
 ; have failed to find a solution.
 .fail:
    +print_string .strfail
-   rts
+   jmp .exit
 
 .foundtriple:
 ; calculate a * b * c
@@ -243,5 +243,8 @@ run:
    +print_string .answer
    ; mathop1 is already pointing to asquare
    jsr math_output_integer
+.exit:   
+   jsr screen_new_line
+   jsr screen_set_basic_cursor
    rts
    
