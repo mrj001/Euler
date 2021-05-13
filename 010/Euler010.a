@@ -142,7 +142,7 @@ run:
    lda .j + 1
    sbc .jul + 1
    beq .testjcomposite   ; branch if .j == .jul
-   bpl .donesieve        ; branch if .j >= .jul (i.e. done)
+   bpl donesieve         ; branch if .j >= .jul (i.e. done)
 
 ; Is .j composite?
 .testjcomposite:
@@ -156,7 +156,7 @@ run:
    beq .nextj            ; branch if .j is composite
    jmp .forj
 
-.donesieve:
+donesieve:
 ;--------------------------------------------------------------------
 ; Add up the primes we've found so far.
 ;--------------------------------------------------------------------
@@ -172,6 +172,8 @@ run:
 
 ; for bitindex = 3; bitindex < 262,144; bitindex += 2
 ; bitindex = 3
+   lda #$00
+   sta bitindex + 2
    sta bitindex + 1
    lda #$03
    sta bitindex
