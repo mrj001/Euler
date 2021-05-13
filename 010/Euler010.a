@@ -1,0 +1,349 @@
+;@com.wudsn.ide.asm.hardware=C64
+!to "Euler010.prg", cbm 
+!cpu 6510
+!sl "Euler010.labels"
+
+; BASIC program: (Where run is replaced by its address.)
+;   10 SYS run
+* = $0801
+    !byte <.basend,>.basend,$0A,$00  ; line 10
+    !byte $54, $49, $24, $b2, $22    ; TI$="000000":
+    !fill $06, $30
+    !byte $22, $3a
+    !byte $9e                        ; Sys keyword
+    !byte (run/1000) % 10 + '0'      ; Address for SYS
+    !byte (run/100) % 10 + '0'
+    !byte (run/10) % 10 + '0'
+    !byte run % 10 + '0'
+    !byte $3a, $99, $20, $54, $49    ; :PRINT TI
+    !byte 0
+.basend !byte 0, 0
+
+mathprec=$05
+mathbcdprec=$06
+
+!src "preamble.a"
+!src "screen.a"
+!src "arithmetic.a"
+!src "bitvectorex.a"
+
+; This macro prints a string
+!macro print_string .str {
+    lda #<.str
+    sta+1 straddr
+    lda #>.str
+    sta+1 straddr + 1
+    jsr subprint
+}
+  
+.answer !scr "the answer is ", 0
+.sieve  !scr "running sieve", 13, 0
+.divide !scr "trial division", 13, 0
+
+.sumofprimes=*
+!fill mathprec, $00
+
+; loop counter
+.j=*
+!fill mathprec, $00
+
+; upper limit of j loop
+.jul=*
+!fill mathprec, $00
+
+; loop counter
+.k=*
+!fill mathprec, $00
+
+.twomillion=*
+!byte $80, $84, $1E
+!fill mathprec - 3, $00
+
+;---------------------------------------------------
+; Sieve of Eratosthenes in a bit vector.
+; The clear bits indicate composite numbers.
+;---------------------------------------------------
+run:
+   jsr subclearscreen
+   +print_string .sieve
+   
+   ldx #$ff
+   jsr bvx_initialize
+
+; .jul = 512 (sqrt(262,144))
+   ldy #mathprec - 1
+   lda #$00
+-  sta .jul, y
+   dey
+   bpl -
+   lda #$02
+   sta .jul + 1
+
+; for .j = 2; j <= jul; j = next prime
+; only the low-order 2 bytes of .j are used in this loop.
+   lda #$02
+   sta .j
+   lda #$00
+   sta .j + 1 
+   sta .j + 2 
+
+.forj:
+; for bitindex = 2 * .j; bitindex < 262,144; bitindex += .j
+   lda .j
+   asl 
+   sta bitindex
+   lda .j + 1 
+   rol 
+   sta bitindex + 1 
+   lda .j + 2 
+   rol 
+   sta bitindex + 2 
+   
+; mark bitindex as composite by clearing its bit.
+.form:
+   jsr bvx_clear_bit
+
+.nextm:
+; bitindex += .j
+   clc
+   lda bitindex
+   adc .j
+   sta bitindex
+   lda bitindex + 1
+   adc .j + 1
+   sta bitindex + 1
+   lda bitindex + 2
+   adc .j + 2
+   sta bitindex + 2
+
+; test .bitindex < 262,144 (The length of the bitvector)
+; branch until bit 19 of bitindex is set
+   and #$04
+   beq .form
+
+.nextj:
+; do
+;    .j ++
+; while .j is composite and .j <= .jul
+   clc
+   lda .j
+   adc #$01
+   sta .j
+   lda .j + 1
+   adc #$00
+   sta .j + 1
+   ; As .jul is 512, we need not be concerned with the
+   ; 3rd byte.
+
+; Is .j <= .jul
+   sec
+   lda .j
+   sbc .jul
+   lda .j + 1
+   sbc .jul + 1
+   beq .testjcomposite   ; branch if .j == .jul
+   bpl .donesieve        ; branch if .j >= .jul (i.e. done)
+
+; Is .j composite?
+.testjcomposite:
+   lda .j
+   sta bitindex
+   lda .j + 1
+   sta bitindex + 1
+   lda .j + 2
+   sta bitindex + 2
+   jsr bvx_get_bit
+   beq .nextj            ; branch if .j is composite
+   jmp .forj
+
+.donesieve:
+;--------------------------------------------------------------------
+; Add up the primes we've found so far.
+;--------------------------------------------------------------------
+; Since 2 is the only even prime, we start with .sumofprimes = 2
+; .sumofprimes = 2
+   ldy #mathprec - 1
+   lda #$00
+-  sta .sumofprimes, y
+   dey
+   bne -
+   lda #$02
+   sta .sumofprimes
+
+; for bitindex = 3; bitindex < 262,144; bitindex += 2
+; bitindex = 3
+   sta bitindex + 1
+   lda #$03
+   sta bitindex
+
+.sum1:
+; Is bitindex prime?
+   jsr bvx_get_bit
+   beq .nextbitindex     ; branch if composite
+
+; Add the 3-byte bitindex to the n-byte .sumofprimes
+   clc
+   lda .sumofprimes
+   adc bitindex
+   sta .sumofprimes
+   lda .sumofprimes + 1
+   adc bitindex + 1
+   sta .sumofprimes + 1
+   lda .sumofprimes + 2
+   adc bitindex + 2
+   sta .sumofprimes + 2
+   ldx #mathprec - 4
+   ldy #$03
+-  lda .sumofprimes, y
+   adc #$00
+   sta .sumofprimes, y
+   iny
+   dex
+   bpl -
+
+.nextbitindex:
+; bitindex += 2
+   clc
+   lda bitindex
+   adc #$02
+   sta bitindex
+   lda bitindex + 1
+   adc #$00
+   sta bitindex + 1
+
+; Is bitindex < 262,144?
+; Since 262,144 is 2**18, we only need to check
+; bit 2 of the 3rd byte, which is already in A
+   and #$04
+   bne .sum1
+
+;--------------------------------------------------------------------
+; Continue by repeated division of odd numbers
+;--------------------------------------------------------------------
+   +print_string .divide
+
+; Set the most significant byte of bitindex to zero.
+; we will no longer need to change it.
+   lda #$00
+   sta bitindex + 2
+
+; .j will be the number being checked for primality
+; for .j = 262,145; .j < 2_000_000; .j += 2
+; .j = 262,145
+   ldy #mathprec - 1
+   lda #$00
+-  sta .j, y
+   dey
+   bne -
+   lda #$01
+   sta .j
+   lda #$04
+   sta .j + 2
+
+.forj2:
+
+; 1414 == floor(sqrt(2_000_000))
+; for .k = 3; .k <= 1414; .k += 2
+; .k = 3 (note: we are only using the low-order 2 bytes of .k)
+   lda #$03
+   sta .k
+   lda #$00
+   sta .k + 1
+
+; point mathop2 to .k
+   lda #<.k
+   sta mathop2
+   lda #>.k
+   sta mathop2 + 1
+
+.fork:
+; Is .k prime?
+   lda .k
+   sta bitindex
+   lda .k + 1
+   sta bitindex + 1
+   jsr bvx_get_bit
+   beq .nextk
+
+; point mathop1 to .j
+   lda #<.j
+   sta mathop1
+   lda #>.j
+   sta mathop1 + 1
+
+; divide .j by .k
+   jsr math_divide
+
+; Is remainder == 0?
+   ldy #mathprec - 1
+-  lda (mathop1), y
+   bne .nextk          ; branch if .k is not a factor of .j
+   dey
+   bpl -
+
+; Remainder is zero.
+; Therefore, .j is composite.  Goto nextj
+   jmp .nextj2
+
+.nextk:
+; .k += 2
+   clc
+   lda .k
+   adc #$02
+   sta .k
+   lda .k + 1
+   adc #$00
+   sta .k + 1
+
+; Is .k <= 1414?
+; 1415 == $0587
+   sec
+   lda .k
+   sbc #$87
+   lda .k + 1
+   sbc #$05
+   bmi .fork      ; branch if .k - 1415 is negative
+
+; At this point, all prime numbers <= 1414 are not
+; factors of .j.  Therefore, .j is prime.
+; Add .j to .sumofprimes
+   +math_set_param_add .j, .k, .sumofprimes
+   jsr math_add
+
+.nextj2:
+; .j += 2
+   clc
+   lda .j
+   adc #$02
+   sta .j
+   ldy #$01
+   ldx #mathprec - 1
+-  lda .j, y
+   adc #$00
+   sta .j, y
+   iny
+   dex
+   bne -
+
+; Is .j < 2,000,000?
+   lda #<.j 
+   sta mathop1
+   lda #>.j 
+   sta mathop1 + 1
+   lda #<.twomillion
+   sta mathop2
+   lda #>.twomillion
+   sta mathop2 + 1
+   jsr math_compare
+   bpl .done
+   jmp .forj2
+
+; done
+.done:
+   +print_string .answer
+   +math_set_param_output_integer .sumofprimes
+   jsr math_output_integer
+   jsr screen_new_line
+   jsr screen_set_basic_cursor
+   rts
+
