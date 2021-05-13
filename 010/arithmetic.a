@@ -819,18 +819,14 @@ math_divide:
 .fork:
 ; quotient *= 2
    ldy #$00
+   ldx #mathprec
    clc
-   php
-.doublequotient:
-   plp
-   lda quotient, y
-   rol  
+-  lda quotient, y
+   rol
    sta quotient, y
-   php
    iny
-   cpy #mathprec
-   bmi .doublequotient
-   plp
+   dex
+   bne -
 
 ; Shift the remainder and dividend one bit left,
 ; with the high bit of the dividend being shifted
