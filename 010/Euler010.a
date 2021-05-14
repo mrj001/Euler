@@ -38,6 +38,7 @@ mathbcdprec=$06
   
 .answer !scr "the answer is ", 0
 .sieve  !scr "running sieve", 13, 0
+.after  !scr "after sieve: ", 0
 .divide !scr "trial division", 13, 0
 
 .sumofprimes=*
@@ -212,12 +213,21 @@ donesieve:
    lda bitindex + 1
    adc #$00
    sta bitindex + 1
+   lda bitindex + 2
+   adc #$00
+   sta bitindex + 2
 
 ; Is bitindex < 262,144?
 ; Since 262,144 is 2**18, we only need to check
 ; bit 2 of the 3rd byte, which is already in A
    and #$04
-   bne .sum1
+   beq .sum1
+
+; Output result so far
+   +print_string .after
+   +math_set_param_output_integer .sumofprimes
+   jsr math_output_integer
+   jsr screen_new_line
 
 ;--------------------------------------------------------------------
 ; Continue by repeated division of odd numbers
