@@ -287,7 +287,7 @@ donesieve:
    jsr math_divide
 
 ; Is remainder == 0?
-   ldy #mathprec - 1
+   ldy #2              ; mathprec - 1
 -  lda (mathop1), y
    bne .nextk          ; branch if .k is not a factor of .j
    dey
@@ -298,7 +298,7 @@ donesieve:
    jmp .nextj2
 
 .nextk:
-; .k += 2
+; .k += 2 (only need to do add for 2 bytes)
    clc
    lda .k
    adc #$02
@@ -323,19 +323,17 @@ donesieve:
    jsr math_add
 
 .nextj2:
-; .j += 2
+; .j += 2 (only need to do add for 3 bytes)
    clc
    lda .j
    adc #$02
    sta .j
-   ldy #$01
-   ldx #mathprec - 1
--  lda .j, y
+   lda .j + 1
    adc #$00
-   sta .j, y
-   iny
-   dex
-   bne -
+   sta .j + 1
+   lda .j + 2
+   adc #$00
+   sta .j + 2
 
 ; Is .j < 2,000,000?
    lda #<.j 
@@ -346,7 +344,7 @@ donesieve:
    sta mathop2
    lda #>.twomillion
    sta mathop2 + 1
-   jsr math_compare
+   jsr compare3
    bpl .done
    jmp .forj2
 
@@ -359,3 +357,198 @@ donesieve:
    jsr screen_set_basic_cursor
    rts
 
+;-------------------------------------------------------------------- 
+; For performance, it is necessary to use 3-byte arithmetic for the
+; trial divisions.  Five bytes are necessary for the sum of primes.
+;-------------------------------------------------------------------- 
+ 
+!zone division3 {
+!macro set_param_divide3 .dividend, .divisor {
+   lda #<.dividend
+   sta mathop1
+   lda #>.dividend
+   sta mathop1 + 1
+
+   lda #<.divisor
+   sta mathop2
+   lda #>.divisor
+   sta mathop2 + 1
+}
+quotient=*
+!fill 3, $00
+
+; Note: the remainder must directly follow the dividend in memory
+; as we will shift them one bit to the left in a single loop.
+.dividend=*
+!fill 3, $00
+
+remainder=*
+!fill 3, $00
+
+; loop counter: j counts over the bytes of the operands
+.j=*
+!byte $00
+
+; loop counter: k counts from 0 to 8 bits
+.k=*
+!byte $00
+
+;
+; Divides mathop1 by mathop2, using 3-byte integers.
+;
+; Inputs:
+;  mathop1: points to the dividend
+;  mathop2: points to the divisor
+;
+; Outputs:
+;  remainder: contains the remainder of the division
+;  quotient:  contains the quotient of the division
+;
+; Side Effects:
+;  mathop1 is changed to point to remainder
+;
+divide3:
+; zero out the quotient and remainder
+   lda #$00
+   ldy #2                  ; mathprec - 1
+.init1:
+   sta quotient, y
+   sta remainder, y
+   dey
+   bpl .init1:
+
+; .dividend = (mathop1)
+   ldy #2                  ; mathprec - 1
+.init2:
+   lda (mathop1), y
+   sta .dividend, y
+   dey
+   bpl .init2
+
+; change mathop1 to point to remainder
+   lda #<remainder
+   sta mathop1
+   lda #>remainder
+   sta mathop1 + 1
+
+; For each bit of the operands (.j & .k loops together)
+; for .j = mathprec; .j >= 1; j --
+   lda #3                 ; mathprec
+   sta .j
+.forj:
+; for .k = 8; .k >= 1; .k --
+   lda #$08
+   sta .k
+.fork:
+; quotient *= 2
+   ldy #$00
+   ldx #3                 ; mathprec
+   clc
+-  lda quotient, y
+   rol
+   sta quotient, y
+   iny
+   dex
+   bne -
+
+; Shift the remainder and dividend one bit left,
+; with the high bit of the dividend being shifted
+; into the low bit of the remainder.
+   ldy #$00
+   ldx #6                 ; mathprec * 2
+   clc
+.shiftremdiv:
+   lda .dividend, y
+   rol
+   sta .dividend, y
+   iny
+   dex
+   bne .shiftremdiv
+
+; Is remainder >= divisor?
+; mathop1 is pointing to remainder
+; mathop2 is pointing to divisor
+   jsr compare3
+   bmi .endif            ; branch if remainder < divisor
+
+; remainder -= divisor
+   sec
+   ldy #$00
+   ldx #3                ; mathprec
+.sub:
+   lda remainder, y
+   sbc (mathop2), y
+   sta remainder, y
+   iny
+   dex
+   bne .sub
+
+; quotient ++
+   ldy #$00
+   ldx #3                ; mathprec
+   sec                   ; adding 1 to quotient
+.add:
+   lda quotient, y
+   adc #$00
+   sta quotient, y
+   iny
+   dex
+   bne .add
+
+.endif:
+
+.nextk:
+   dec .k        ; .k --
+   bne .fork     ; .k >= 1
+
+.nextj:
+   dec .j        ; .j --
+   bne .forj     ; .j >= 1
+
+   rts
+
+}  ; end of zone division3
+   
+ !zone compare3 {
+; Set flags N, Z & C as though a subtraction of a 3-byte integer
+; had been done.  (i.e. op1 - op2).
+; This is analogous to a CMP, but for 3 bytes.
+;
+; Inputs:
+;    mathprec: number of bytes in each integer
+;    mathop1: pointer to first integer to compare
+;    mathop2: pointer to second integer to compare
+;
+; Outputs:
+;  Flags are set as though a subtraction had been done.
+;
+; Flags for masking off the Zero Flag.  The Zero Flag
+; should only be set if ALL bytes of the result are zero.
+.zero=*
+!byte $00
+compare3:
+    lda #$ff        ; initialize zero flag
+    sta .zero
+    ldx #3          ; load count of bytes per integer
+    ldy #$00        ; index into bytes of integer
+    sec
+    php             ; needed to offset pull at start of loop
+.nextbyte:
+    plp             ; retrieve flags from subtraction of the previous byte
+    lda (mathop1), y
+    sbc (mathop2), y
+    php             ; preserve flags
+    beq +
+    lda #$fd        ; clear the bit corresponding to the Zero Flag
+    and .zero
+    sta .zero
++
+    iny             ; alters N & Z
+    dex             ; alters N & Z
+    bne .nextbyte
+    pla             ; transfer flags after last subtraction
+    and .zero       ; clear zero bit if any result byte was non-zero
+    pha             ; transfer modified flags from A to P
+    plp
+    rts
+}  ; end of zone compare3
