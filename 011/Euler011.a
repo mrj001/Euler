@@ -1,0 +1,290 @@
+;@com.wudsn.ide.asm.hardware=C64
+!to "Euler010.prg", cbm 
+!cpu 6510
+!sl "Euler010.labels"
+
+; BASIC program: (Where run is replaced by its address.)
+;   10 SYS run
+* = $0801
+    !byte <.basend,>.basend,$0A,$00  ; line 10
+    !byte $54, $49, $24, $b2, $22    ; TI$="000000":
+    !fill $06, $30
+    !byte $22, $3a
+    !byte $9e                        ; Sys keyword
+    !byte (run/1000) % 10 + '0'      ; Address for SYS
+    !byte (run/100) % 10 + '0'
+    !byte (run/10) % 10 + '0'
+    !byte run % 10 + '0'
+    !byte $3a, $99, $20, $54, $49    ; :PRINT TI
+    !byte 0
+.basend !byte 0, 0
+
+; 99**4 == 96,059,601
+mathprec=$04
+mathbcdprec=$05
+
+!src "preamble.a"
+!src "screen.a"
+!src "arithmetic.a"
+
+; This macro prints a string
+!macro print_string .str {
+    lda #<.str
+    sta+1 straddr
+    lda #>.str
+    sta+1 straddr + 1
+    jsr subprint
+}
+  
+.answer !scr "the answer is ", 0
+
+grid=*
+!byte 08, 02, 22, 97, 38, 15, 00, 40, 00, 75, 04, 05, 07, 78, 52, 12, 50, 77, 91, 08
+!byte 49, 49, 99, 40, 17, 81, 18, 57, 60, 87, 17, 40, 98, 43, 69, 48, 04, 56, 62, 00
+!byte 81, 49, 31, 73, 55, 79, 14, 29, 93, 71, 40, 67, 53, 88, 30, 03, 49, 13, 36, 65
+!byte 52, 70, 95, 23, 04, 60, 11, 42, 69, 24, 68, 56, 01, 32, 56, 71, 37, 02, 36, 91
+!byte 22, 31, 16, 71, 51, 67, 63, 89, 41, 92, 36, 54, 22, 40, 40, 28, 66, 33, 13, 80
+!byte 24, 47, 32, 60, 99, 03, 45, 02, 44, 75, 33, 53, 78, 36, 84, 20, 35, 17, 12, 50
+!byte 32, 98, 81, 28, 64, 23, 67, 10, 26, 38, 40, 67, 59, 54, 70, 66, 18, 38, 64, 70
+!byte 67, 26, 20, 68, 02, 62, 12, 20, 95, 63, 94, 39, 63, 08, 40, 91, 66, 49, 94, 21
+!byte 24, 55, 58, 05, 66, 73, 99, 26, 97, 17, 78, 78, 96, 83, 14, 88, 34, 89, 63, 72
+!byte 21, 36, 23, 09, 75, 00, 76, 44, 20, 45, 35, 14, 00, 61, 33, 97, 34, 31, 33, 95
+!byte 78, 17, 53, 28, 22, 75, 31, 67, 15, 94, 03, 80, 04, 62, 16, 14, 09, 53, 56, 92
+!byte 16, 39, 05, 42, 96, 35, 31, 47, 55, 58, 88, 24, 00, 17, 54, 24, 36, 29, 85, 57
+!byte 86, 56, 00, 48, 35, 71, 89, 07, 05, 44, 44, 37, 44, 60, 21, 58, 51, 54, 17, 58
+!byte 19, 80, 81, 68, 05, 94, 47, 69, 28, 73, 92, 13, 86, 52, 17, 77, 04, 89, 55, 40
+!byte 04, 52, 08, 83, 97, 35, 99, 16, 07, 97, 57, 32, 16, 26, 26, 79, 33, 27, 98, 66
+!byte 88, 36, 68, 87, 57, 62, 20, 72, 03, 46, 33, 67, 46, 55, 12, 32, 63, 93, 53, 69
+!byte 04, 42, 16, 73, 38, 25, 39, 11, 24, 94, 72, 18, 08, 46, 29, 32, 40, 62, 76, 36
+!byte 20, 69, 36, 41, 72, 30, 23, 88, 34, 62, 99, 69, 82, 67, 59, 85, 74, 04, 36, 16
+!byte 20, 73, 35, 29, 78, 31, 90, 01, 74, 31, 49, 71, 48, 86, 81, 16, 23, 57, 05, 54
+!byte 01, 70, 54, 71, 83, 51, 54, 69, 16, 92, 33, 48, 61, 43, 52, 01, 89, 19, 67, 48
+
+maxproduct=*
+!fill mathprec, $00
+
+run:
+   jsr subclearscreen
+   
+; maxproduct = 0
+   ldy #mathprec - 1
+   lda #$00
+-  sta maxproduct, y
+   dey
+   bpl -
+   
+; do the horizontal multiplications
+   lda #$00         ; ymin = 0
+   sta ymin
+   sta stride + 1   ; clear high byte of stride
+   lda #$14         ; ymax = 20
+   sta ymax
+   lda #$10         ; xmax = 16
+   sta xmax
+   lda #$01         ; stride = 1
+   sta stride
+   jsr find_max_product
+   
+; do the vertical multiplications
+; ymin is already 0
+   lda #$10        ; ymax = 16
+   sta ymax
+   lda #$14        ; xmax = 20
+   sta xmax
+   sta stride      ; stride = 20
+   jsr find_max_product
+   
+; do the descending diagonal multiplications
+; ymin is already 0
+; ymax is already 16
+   lda #$10        ; xmax = 16
+   sta xmax
+   lda #$15        ; stride = 21
+   sta stride
+   jsr find_max_product
+   
+; do the ascending diagonal multiplications
+   lda #$04        ; ymin = 4
+   sta ymin
+; ymax is already 16
+; xmax is already 16
+   lda #$ed        ; stride = -19
+   sta stride
+   lda #$ff
+   sta stride + 1
+   jsr find_max_product
+   
+; maxproduct now contains the answer.
+   +print_string .answer
+   +math_set_param_output_integer maxproduct
+   jsr math_output_integer
+   jsr screen_new_line
+   jsr screen_set_basic_cursor
+   rts
+
+!zone zn_find_max_product {
+  ;
+  ; Calculates the maximum product in one direction in the grid.
+  ;
+  ; Inputs:
+  ;  xmax: maximum value of x to use
+  ;  ymin: minimum value of y to use (only has to be non-zero for diagonal proceeding
+  ;      up to the right.
+  ;  ymax: maximum value of y to use
+  ;  stride: amount to add to address to find the next factor in a product.
+  ;  maxproduct:  The maximum product found so far.
+  ;
+  ; Side Effects:
+  ;  mathop1, mathop2 and mathres are altered.
+  ;
+  xmax=*
+  !byte $00
+  ymin=*
+  !byte $00
+  ymax=*
+  !byte $00
+  stride=*
+  !byte $00, $00
+  
+  ; loop counter
+  .x=*
+  !byte $00
+  
+  ; loop counter
+  .y=*
+  !byte $00
+  
+  ; Copies of the 4 bytes to multiply
+  .numbers=*
+  !fill 4, $00
+  
+  ; will hold the product of the first two numbers.
+  .p1=*
+  !fill mathprec, $00
+  ; will hold the product of the 3rd and 4th numbers.
+  .p2=*
+  !fill mathprec, $00
+  ; will contain the product of .p1 and .p2
+  .product=*
+  !fill mathprec, $00
+  
+find_max_product:
+   ; point mathop1 to .p1
+   lda #<.p1
+   sta mathop1
+   lda #>.p1
+   sta mathop1 + 1
+  
+   ; point mathop2 to .p2
+   lda #<.p2
+   sta mathop2
+   lda #>.p2
+   sta mathop2 + 1
+  
+   ; point mathres to .product
+   lda #<.product
+   sta mathres
+   lda #>.product
+   sta mathres + 1
+  
+ ; for .x = 0; .x < .xmax; .x ++
+; .x = 0
+   lda #$00
+   sta .x
+.forx:
+  
+  ; for .y = ymin; .y < .ymax; .y ++
+   lda ymin
+   sta .y
+.fory:
+  
+; .ptr = .grid + .x
+   clc
+   lda #<grid
+   adc .x
+   sta .ptr
+   lda #>grid
+   adc #$00
+   sta .ptr + 1
+  
+; .ptr += 20 * .y
+   lda .y
+   ldy #$14
+   jsr math_multiply_byte
+   clc
+   lda .ptr
+   adc product_byte
+   sta .ptr
+   lda .ptr + 1
+   adc product_byte + 1
+   sta .ptr + 1
+  
+; Copy the 4 bytes to be multiplied
+   ldy #$03
+.ptr=*+1             ; .ptr is the location from which a byte will be loaded.
+-  lda grid          ; grid is a placeholder that will be altered
+   sta .numbers, y
+   clc               ; advance .ptr by stride
+   lda .ptr
+   adc stride
+   sta .ptr
+   lda .ptr + 1
+   adc stride + 1
+   sta .ptr + 1
+   dey
+   bpl -
+   
+; multiply the first two bytes into .p1
+   lda .numbers
+   ldy .numbers + 1
+   jsr math_multiply_byte
+   lda product_byte
+   sta .p1
+   lda product_byte + 1
+   sta .p1 + 1
+   
+; multiply the 3rd and 4th bytes into .p2
+   lda .numbers + 2
+   ldy .numbers + 3
+   jsr math_multiply_byte   
+   lda product_byte
+   sta .p2
+   lda product_byte+ 1
+   sta .p2 + 1
+   
+; multiply .p1 and .p2
+   jsr math_multiply
+
+; Is .product > maxproduct?
+   ldy #mathprec - 1
+-  lda maxproduct, y
+   cmp .product, y
+   bcc .copyproduct    ; branch to copy if maxproduct < .product
+   bne .nexty          ; branch to next y if maxproduct > .product
+   dey
+   bpl -
+   jmp .nexty
+.copyproduct:
+   ldy #mathprec - 1
+-  lda .product, y
+   sta maxproduct, y
+   dey
+   bpl -
+   
+.nexty:
+   inc .y
+   lda .y
+   cmp ymax
+   bpl .nextx
+   jmp .fory
+   
+.nextx:
+   inc .x
+   lda .x
+   cmp xmax
+   bpl .done
+   jmp .forx
+   
+.done:
+   rts
+  }
