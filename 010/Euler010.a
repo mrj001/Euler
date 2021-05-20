@@ -284,7 +284,7 @@ donesieve:
    sta mathop1 + 1
 
 ; divide .j by .k
-   jsr math_divide
+   jsr divide3
 
 ; Is remainder == 0?
    ldy #2              ; mathprec - 1
@@ -374,7 +374,7 @@ donesieve:
    lda #>.divisor
    sta mathop2 + 1
 }
-quotient=*
+quotient3=*
 !fill 3, $00
 
 ; Note: the remainder must directly follow the dividend in memory
@@ -382,7 +382,7 @@ quotient=*
 .dividend=*
 !fill 3, $00
 
-remainder=*
+remainder3=*
 !fill 3, $00
 
 ; loop counter: j counts over the bytes of the operands
@@ -401,19 +401,19 @@ remainder=*
 ;  mathop2: points to the divisor
 ;
 ; Outputs:
-;  remainder: contains the remainder of the division
-;  quotient:  contains the quotient of the division
+;  remainder3: contains the remainder of the division
+;  quotient3:  contains the quotient of the division
 ;
 ; Side Effects:
-;  mathop1 is changed to point to remainder
+;  mathop1 is changed to point to remainder3
 ;
 divide3:
 ; zero out the quotient and remainder
    lda #$00
    ldy #2                  ; mathprec - 1
 .init1:
-   sta quotient, y
-   sta remainder, y
+   sta quotient3, y
+   sta remainder3, y
    dey
    bpl .init1:
 
@@ -426,9 +426,9 @@ divide3:
    bpl .init2
 
 ; change mathop1 to point to remainder
-   lda #<remainder
+   lda #<remainder3
    sta mathop1
-   lda #>remainder
+   lda #>remainder3
    sta mathop1 + 1
 
 ; For each bit of the operands (.j & .k loops together)
@@ -444,9 +444,9 @@ divide3:
    ldy #$00
    ldx #3                 ; mathprec
    clc
--  lda quotient, y
+-  lda quotient3, y
    rol
-   sta quotient, y
+   sta quotient3, y
    iny
    dex
    bne -
@@ -466,19 +466,19 @@ divide3:
    bne .shiftremdiv
 
 ; Is remainder >= divisor?
-; mathop1 is pointing to remainder
+; mathop1 is pointing to remainder3
 ; mathop2 is pointing to divisor
    jsr compare3
-   bmi .endif            ; branch if remainder < divisor
+   bmi .endif            ; branch if remainder3 < divisor
 
 ; remainder -= divisor
    sec
    ldy #$00
    ldx #3                ; mathprec
 .sub:
-   lda remainder, y
+   lda remainder3, y
    sbc (mathop2), y
-   sta remainder, y
+   sta remainder3, y
    iny
    dex
    bne .sub
@@ -488,9 +488,9 @@ divide3:
    ldx #3                ; mathprec
    sec                   ; adding 1 to quotient
 .add:
-   lda quotient, y
+   lda quotient3, y
    adc #$00
-   sta quotient, y
+   sta quotient3, y
    iny
    dex
    bne .add
