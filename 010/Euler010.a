@@ -254,8 +254,7 @@ donesieve:
 
 .forj2:
 
-; 1414 == floor(sqrt(2_000_000))
-; for .k = 3; .k <= 1414; .k += 2
+; for .k = 3; .k <= quotient3; .k += 2
 ; .k = 3 (note: we are only using the low-order 2 bytes of .k)
    lda #$03
    sta .k
@@ -289,7 +288,7 @@ donesieve:
 ; Is remainder == 0?
    ldy #2              ; mathprec - 1
 -  lda (mathop1), y
-   bne .nextk          ; branch if .k is not a factor of .j
+   bne .testk          ; branch if .k is not a factor of .j
    dey
    bpl -
 
@@ -297,8 +296,20 @@ donesieve:
 ; Therefore, .j is composite.  Goto nextj
    jmp .nextj2
 
-.nextk:
+; Is .k <= quotient3? (3-byte comparison)
+.testk:
+   ldy #$02
+-  lda .k, y
+   cmp quotient3, y
+   bcc .nextk       ; branch if .k < quotient3
+   bne prime_found  ; branch if .k > quotient3 (& therefore .k > sqrt(.j))
+   dey              ; bytes were equal
+   bpl -            ; check next byte, if not done.
+; To arrive here, .k == quotient3 AND remainder != 0
+; Therefore .j > .k * .k; so loop again.
+
 ; .k += 2 (only need to do add for 2 bytes)
+.nextk:
    clc
    lda .k
    adc #$02
@@ -306,19 +317,12 @@ donesieve:
    lda .k + 1
    adc #$00
    sta .k + 1
+   jmp .fork
 
-; Is .k <= 1414?
-; 1415 == $0587
-   sec
-   lda .k
-   sbc #$87
-   lda .k + 1
-   sbc #$05
-   bmi .fork      ; branch if .k - 1415 is negative
-
-; At this point, all prime numbers <= 1414 are not
+; At this point, all prime numbers <= sqrt(.j) are not
 ; factors of .j.  Therefore, .j is prime.
 ; Add .j to .sumofprimes
+prime_found:
    +math_set_param_add .j, .k, .sumofprimes
    jsr math_add
 
