@@ -323,7 +323,7 @@ donesieve:
 ; factors of .j.  Therefore, .j is prime.
 ; Add .j to .sumofprimes
 prime_found:
-   +math_set_param_add .j, .k, .sumofprimes
+   +math_set_param_add .j, .sumofprimes, .sumofprimes
    jsr math_add
 
 .nextj2:
