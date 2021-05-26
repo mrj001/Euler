@@ -812,27 +812,27 @@ math_divide:
    sta .k
 .fork:
 ; quotient *= 2
-   ldy #$00
+   ldy #$ff
    ldx #mathprec
    clc
--  lda quotient, y
+-  iny
+   lda quotient, y
    rol
    sta quotient, y
-   iny
    dex
    bne -
 
 ; Shift the remainder and dividend one bit left,
 ; with the high bit of the dividend being shifted
 ; into the low bit of the remainder.
-   ldy #$00
+   ldy #$ff
    ldx #mathprec * 2
    clc
 .shiftremdiv:
+   iny
    lda .dividend, y
    rol
    sta .dividend, y
-   iny
    dex
    bne .shiftremdiv
 
@@ -848,13 +848,13 @@ math_divide:
 
 ; remainder -= divisor
 +  sec
-   ldy #$00
+   ldy #$ff
    ldx #mathprec
 .sub:
+   iny
    lda remainder, y
    sbc (mathop2), y
    sta remainder, y
-   iny
    dex
    bne .sub
 
