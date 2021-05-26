@@ -782,7 +782,7 @@ remainder=*
 ;  quotient:  contains the quotient of the division
 ;
 ; Side Effects:
-;  mathop1 is changed to point to remainder
+;  n/a
 ;
 math_divide:
 ; zero out the quotient and remainder
@@ -801,12 +801,6 @@ math_divide:
    sta .dividend, y
    dey
    bpl .init2
-
-; change mathop1 to point to remainder
-   lda #<remainder
-   sta mathop1
-   lda #>remainder
-   sta mathop1 + 1
 
 ; For each bit of the operands (.j & .k loops together)
 ; for .j = mathprec; .j >= 1; j --
@@ -843,13 +837,17 @@ math_divide:
    bne .shiftremdiv
 
 ; Is remainder >= divisor?
-; mathop1 is pointing to remainder
 ; mathop2 is pointing to divisor
-   jsr math_compare
-   bmi .endif         ; branch if remainder < divisor
+   ldy #mathprec - 1
+-  lda remainder, y
+   cmp (mathop2), y
+   bcc .endif        ; branch if remainder < divisor
+   bne +             ; branch if remainder > divisor
+   dey
+   bpl -
 
 ; remainder -= divisor
-   sec
++  sec
    ldy #$00
    ldx #mathprec
 .sub:

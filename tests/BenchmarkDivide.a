@@ -64,6 +64,12 @@ run:
    lda #>.prime
    sta mathop2 + 1
 
+; point mathop1 to the divisor .j
+   lda #<.j
+   sta mathop1
+   lda #>.j
+   sta mathop1 + 1
+
 ; for .j = 2; .j <= .jul; .j ++
    ldy #mathprec - 1
    lda #$00
@@ -74,12 +80,6 @@ run:
    sta .j
 
 .forj:
-; point mathop1 to the divisor .j
-   lda #<.j
-   sta mathop1
-   lda #>.j
-   sta mathop1 + 1
-
    jsr math_divide
 
 ; next j
