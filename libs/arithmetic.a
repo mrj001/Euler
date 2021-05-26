@@ -859,16 +859,16 @@ math_divide:
    bne .sub
 
 ; quotient ++
-   ldy #$00
+   ldy #$ff
    ldx #mathprec
    sec            ; adding 1 to quotient
 .add:
+   iny
    lda quotient, y
    adc #$00
    sta quotient, y
-   iny
    dex
-   bne .add
+   bcs .add
 
 .endif:
 
