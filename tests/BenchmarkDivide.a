@@ -1,0 +1,106 @@
+;@com.wudsn.ide.asm.hardware=C64 !to "BenchmarkDivide.prg", cbm 
+!to "BenchmarkDivide.prg", cbm
+!cpu 6510
+!sl "BenchmarkDivide.labels"
+
+; BASIC program: (Where run is replaced by its address.)
+;   10 SYS run
+* = $0801
+    !byte <.basend,>.basend,$0A,$00  ; line 10
+    !byte $54, $49, $24, $b2, $22    ; TI$="000000":
+    !fill $06, $30
+    !byte $22, $3a
+    !byte $9e                        ; Sys keyword
+    !byte (run/1000) % 10 + '0'      ; Address for SYS
+    !byte (run/100) % 10 + '0'
+    !byte (run/10) % 10 + '0'
+    !byte run % 10 + '0'
+    !byte $3a, $99, $20, $54, $49    ; :PRINT TI
+    !byte 0
+.basend !byte 0, 0
+
+mathprec=$05
+mathbcdprec=$06
+
+!src "../libs/preamble.a"
+!src "../libs/screen.a"
+!src "../libs/arithmetic.a"
+
+; This macro prints a string
+!macro print_string .str {
+    lda #<.str
+    sta+1 straddr
+    lda #>.str
+    sta+1 straddr + 1
+    jsr subprint
+}
+  
+.answer !scr "the answer is ", 0
+
+; loop counter
+.j=*
+!fill mathprec, $00
+
+; upper limit of j loop
+.jul=*
+!byte $a0, $86, $01
+!fill mathprec - 3, $00
+
+; A largish prime number
+; 10,000,000,019
+.prime=*
+!byte $13, $E4, $0b, $54, $02
+
+;
+; Time how long it takes to do 100,000 or so divisions
+; in order to otimize the division implementation.
+;
+run:
+   jsr subclearscreen
+
+; point mathop2 to .prime
+   lda #<.prime
+   sta mathop2
+   lda #>.prime
+   sta mathop2 + 1
+
+; for .j = 2; .j <= .jul; .j ++
+   ldy #mathprec - 1
+   lda #$00
+-  sta .j, y
+   dey
+   bne -
+   lda #$02
+   sta .j
+
+.forj:
+; point mathop1 to the divisor .j
+   lda #<.j
+   sta mathop1
+   lda #>.j
+   sta mathop1 + 1
+
+   jsr math_divide
+
+; next j
+; .j ++
+   sec
+   ldx #mathprec
+   ldy #$ff
+-  iny
+   lda .j, y
+   adc #$00
+   sta .j, y
+   dex
+   bcs -
+
+; test .j <= .jul
+   ldy #mathprec - 1
+-  lda .j, y
+   cmp .jul, y
+   bcc .forj     ; carry will be set if .j >= .jul; clear if .jul < .j
+   dey
+   bpl -
+
+.done:
+   rts
