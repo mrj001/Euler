@@ -1,0 +1,197 @@
+; Bit Vector routines
+
+!zone bitvector {
+bitvector_length=2000
+
+;
+; Clears all bits within the Bit Vector to zero
+;
+; Inputs: n/a
+;
+; Outputs: n/a
+;
+; Side Effects:
+;  tmpaddr is altered.
+;
+.remaining=*
+!byte $00, $00
+
+bitvector_clear:
+;  point tmpaddr to .bitvector
+   lda #<.bitvector
+   sta tmpaddr
+   lda #>.bitvector
+   sta tmpaddr + 1
+
+; set .remaining to the length of the bit vector
+   lda #<bitvector_length
+   sta .remaining
+   lda #>bitvector_length
+   sta .remaining + 1
+
+; Is there 256 bytes or more remaining to clear?
+.clearblocks:
+   lda .remaining + 1
+   beq .finish_clear
+
+; Clear a block of 256 bytes
+   lda #$00
+   tay
+.clear256:
+   dey
+   sta (tmpaddr), y
+   bne .clear256
+   sta (tmpaddr), y
+
+   inc tmpaddr + 1      ; increment the high byte of the pointer
+   dec .remaining + 1   ; decrement the high byte of .remaining
+   bne .clearblocks     ; branch if there is 256 bytes or more remaining
+
+.finish_clear:
+   lda #$00
+   ldy .remaining
+.finish_loop:
+   dey
+   sta (tmpaddr), y
+   bne .finish_loop
+   sta (tmpaddr), y
+   
+   rts
+
+;
+; Gets a specified bit in the Bit Vector
+;
+; Inputs:
+;   A: low byte of the bit index
+;   Y: high byte of the bit index
+;
+; Outputs:
+;  The Z flag is set if the specified bit is clear
+;  The Z flag will be clear if the specified bit is set.
+;
+; Side Effects:
+;   tmpaddr is altered
+;
+bitvector_getbit:
+   jsr .helper
+   ldy #$00
+   and (tmpaddr), y
+
+   rts
+
+;
+; Sets a specified bit in the Bit Vector
+;
+; Inputs:
+;   A: low byte of the bit index
+;   Y: high byte of the bit index
+;
+; Outputs: n/a
+;
+; Side Effects:
+;   tmpaddr is altered
+;
+bitvector_setbit:
+   jsr .helper
+   ldy #$00
+   ora (tmpaddr), y
+   sta (tmpaddr), y
+
+   rts
+
+;
+; Clears the specified bit in the Bit Vector
+;
+; Inputs:
+;   A: low byte of the bit index
+;   Y: high byte of the bit index
+;
+; Outputs: n/a
+;
+; Side Effects:
+;   tmpaddr is altered
+;
+bitvector_clearbit:
+   jsr .helper
+   eor #$ff              ; invert the bit mask
+   ldy #$00
+   and (tmpaddr), y
+   sta (tmpaddr), y
+
+   rts
+
+;
+; This subroutine uses the arguments in A & Y to
+; set up the addressing of the desired bit.
+;
+; Inputs:
+;   A: low byte of the bit index
+;   Y: high byte of the bit index
+;
+; Outputs:
+;  A contains a mask for the desired bit.
+;  tmpaddr contains a pointer to the byte containing
+;  the desired bit.
+;
+; Side Effects:
+;   tmpaddr is altered
+;
+.helper:
+   sta .bitindex
+   sty .bitindex + 1
+
+; Copy the least significant 3 bits to X
+   and #$07
+   tax
+
+; Divide the bit index by 8 to get the byte offset
+; within bit vector of the desired bit.
+   ldy #$03
+.divide8:
+   lsr .bitindex + 1
+   ror .bitindex
+   dey
+   bne .divide8
+
+; Add .bitvector to .bitindex, storing in tmpaddr
+; tmpaddr will point to the byte containing the 
+; desired bit.
+   clc
+   lda .bitindex
+   adc #<.bitvector
+   sta tmpaddr
+   lda .bitindex + 1
+   adc #>.bitvector
+   sta tmpaddr + 1
+
+; Convert the bit number in X to a bit mask in A
+   lda #$00
+   sec
+.bitmask:
+   rol
+   dex
+   cpx #$ff
+   clc
+   bne .bitmask
+
+   rts
+
+; A location in which we can store the index into the bit vector.
+.bitindex=*
+!byte $00, $00
+
+!ifdef __TEST_BITVECTOR {
+bitvector_sentinel_lo=*
+!byte $ba
+}
+
+ .bitvector=*
+!fill bitvector_length, $ff
+
+!ifdef __TEST_BITVECTOR {
+bitvector_sentinel_hi=*
+!byte $ad
+}
+
+} ; end of zone bitvector
+

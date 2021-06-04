@@ -1,0 +1,361 @@
+;@com.wudsn.ide.asm.hardware=C64
+!to "Euler012.prg", cbm 
+!cpu 6510
+!sl "Euler012.labels"
+
+; BASIC program: (Where run is replaced by its address.)
+;   10 SYS run
+* = $0801
+    !byte <.basend,>.basend,$0A,$00  ; line 10
+    !byte $54, $49, $24, $b2, $22    ; TI$="000000":
+    !fill $06, $30
+    !byte $22, $3a
+    !byte $9e                        ; Sys keyword
+    !byte (run/1000) % 10 + '0'      ; Address for SYS
+    !byte (run/100) % 10 + '0'
+    !byte (run/10) % 10 + '0'
+    !byte run % 10 + '0'
+    !byte $3a, $99, $20, $54, $49    ; :PRINT TI
+    !byte 0
+.basend !byte 0, 0
+
+mathprec=$04
+mathbcdprec=$05
+
+!src "preamble.a"
+!src "screen.a"
+!src "arithmetic.a"
+!src "bitvector.a"
+
+; This macro prints a string
+!macro print_string .str {
+    lda #<.str
+    sta+1 straddr
+    lda #>.str
+    sta+1 straddr + 1
+    jsr subprint
+}
+  
+.answer !scr "the answer is ", 0
+
+; loop counter
+n=*
+!fill mathprec, $00
+
+; current triangle number
+triangle=*
+!fill mathprec, $00
+
+; constant of 500
+five_hundred=*
+!byte $f4, $01
+!fill mathprec - 2, $00
+
+; loop counter for Sieve
+.j=*
+!fill mathprec, $00
+
+; Multiple of .j for Sieve.
+.m=*
+!fill mathprec, $00
+
+run:
+   jsr subclearscreen
+
+;---------------------------------------------------
+; Sieve of Eratosthenes in a bit vector.
+; The set bits indicate composite numbers.
+;---------------------------------------------------
+   jsr bitvector_clear
+
+; for .j = 2
+   lda #$02
+   sta .j
+   lda #$00
+   sta .j + 1
+
+.forj:
+; .m = 2 * .j
+   lda .j
+   asl
+   sta .m
+   lda .j + 1
+   rol
+   sta .m + 1
+
+; mark .m as composite by setting its bit.
+.form:
+   lda .m
+   ldy .m + 1
+   jsr bitvector_setbit
+
+.nextm:
+; .m += .j
+   clc
+   lda .m
+   adc .j
+   sta .m
+   lda .m + 1
+   adc .j + 1
+   sta .m + 1
+
+; test .m <= bitvector_length
+   lda .m + 1
+   cmp #>bitvector_length
+   bcc .form                   ; branch if .m < bitvector_length
+   lda .m
+   cmp #<bitvector_length
+   bcc .form                   ; branch if .m < bitvector_length
+   beq .form                   ; branch if .m == bitvector_length
+
+.nextj:
+; do
+;    .j ++
+; while .j is composite and .j <= bitvector_length
+   clc
+   lda .j
+   adc #$01
+   sta .j
+   lda #$00
+   adc .j + 1
+   sta .j + 1
+
+; Is .j <= bitvector_length
+   lda #>bitvector_length
+   cmp .j + 1
+   bcc .donesieve          ; branch if bitvector_length < .j
+   lda #<bitvector_length
+   cmp .j
+   bcc .donesieve          ; branch if bitvector_length < .j
+
+; Is .j composite?
+.testjcomposite:
+   ldy .j + 1
+   lda .j
+   jsr bitvector_getbit
+   bne .nextj            ; branch if .j is composite
+   jmp .forj
+
+.donesieve:
+; n = 1
+; triangle = 1
+   ldy #mathprec -1
+   lda #$00
+-  sta n, y
+   sta triangle, y
+   dey
+   bne -
+   lda #$01
+   sta n
+   sta triangle
+   
+.loop:
+   ; Get count of factors of triangle
+   ; number_to_factor = triangle
+   ldy #mathprec - 1
+-  lda triangle, y
+   sta number_to_factor, y
+   dey
+   bpl -
+   
+   jsr sub_get_factor_count
+   
+   ; Is total_factors > 500?
+   lda #<total_factors
+   sta mathop1
+   lda #>total_factors
+   sta mathop1 + 1
+   lda #<five_hundred
+   sta mathop2
+   lda #>five_hundred
+   sta mathop2 + 1
+   jsr math_compare
+   beq .next_triangle       ; branch if total_factors == 500
+   bpl .done                ; branch if total_factors >= 500 factors
+   
+   
+.next_triangle
+   ; n += 1
+   sec
+   ldy #$00
+   ldx #mathprec
+-  lda n, y
+   adc #$00
+   sta n, y
+   iny
+   dex
+   bne -
+   
+   ; Triangle += n
+   ldy #$00
+   ldx #mathprec
+-  lda triangle, y
+   adc n, y
+   sta triangle, y
+   iny
+   dex
+   bne -
+   
+   jmp .loop
+   
+   ; Found a triangle number with > 500 factors
+.done:
+   +print_string .answer
+   +math_set_param_output_integer triangle
+   jsr math_output_integer
+   jsr screen_new_line
+   jsr screen_set_basic_cursor
+   rts
+
+!zone zn_factor_count {
+  ; Number to factor; will be divided in place.
+  number_to_factor=*
+  !fill mathprec, $00
+  
+  ; Current prime number being tried as a factor
+  .factor=*
+  !fill mathprec, $00
+  
+  ; One plus the count of the number of times .factor divides into number_to_factor.
+  .factor_count=*
+  !fill mathprec, $00
+  
+  ; Total number of factors of number_to_factor
+  total_factors=*
+  !fill mathprec, $00
+  
+  ; Bit 0: set means no zero remainders for current .factor
+  .flags=*
+  !byte $00
+  ;
+  ; Calculates the number of factors of the given number
+  ;
+  ; Inputs:
+  ;  number_to_factor (note:  value will be destroyed)
+  ;
+  ; Outputs:
+  ;  total_factors: returns the number of factors
+  ;
+  ; Side Effects:
+  ; mathop1, mathop2, and mathres are all altered
+  ;
+  
+  sub_get_factor_count:
+  ; .factor = 2
+  ; total_factors = 1
+  ; .factor_count = 1
+   ldy #mathprec - 1
+   lda #$00
+-  sta .factor, y
+   sta total_factors, y
+   sta .factor_count, y
+   dey
+   bne -
+   lda #$02
+   sta .factor
+   lda #$01
+   sta total_factors
+   sta .factor_count
+
+.factor_loop:   
+   ; while number_to_factor != 1
+   lda #<number_to_factor
+   sta mathop1
+   lda #>number_to_factor
+   sta mathop1 + 1
+   lda #<one
+   sta mathop2
+   lda #>one
+   sta mathop2 + 1
+   jsr math_compare
+   bne .check_factor
+   
+   ; we are done
+   rts
+   
+.check_factor:
+   ; Set flag to indicate no zero remainders for this prime number
+   lda .flags
+   ora #$01
+   sta .flags
+   
+   ; while number_to_factor % .factor == 0
+.divide:
+   +math_set_param_divide number_to_factor, .factor
+   jsr math_divide
+   
+   ; Is the remainder zero?
+   ldy #$00
+   ldx #mathprec
+-  lda remainder, y
+   bne .next_factor        ; Branch on non-zero remainder
+   iny
+   dex
+   bne -
+   
+   ; The remainder is zero
+   ; Clear flag to show we've had a zero remainder
+   lda .flags
+   and #$fe
+   sta .flags
+   
+   ; number_to_factor = quotient
+   ldy #mathprec - 1
+-  lda quotient, y
+   sta number_to_factor, y
+   dey
+   bpl -
+   
+   ; increment .factor_count
+   sec
+   ldy #$ff
+   ldx #mathprec
+-  iny
+   lda .factor_count, y
+   adc #$00
+   sta .factor_count, y
+   dex
+   bcs -
+   jmp .divide       ; try to divide by .factor again.
+   
+   ; The remainder is not zero; 
+.next_factor:
+   ; Did we have any zero remainders ?
+   lda .flags
+   and #$01
+   bne .increment_factor  ; branch if no zero remainders
+
+   ; .total_factors *= .factor_count
+   ; Note .factor_count is one plus the number of divisions with remainder zero.
+   +math_set_param_multiply total_factors, .factor_count, total_factors
+   jsr math_multiply
+
+   .increment_factor:
+   sec
+   ldy #$ff
+   ldx #mathprec
+-  iny
+   lda .factor, y
+   adc #$00
+   sta .factor, y
+   dex
+   bcs -
+   
+   ; Is .factor prime?
+   lda .factor
+   ldy .factor + 1
+   jsr bitvector_getbit
+   bne .increment_factor       ; branch if .factor is composite
+   
+   ; .factor_count = 1
+   ldy #mathprec - 1
+   lda #$00
+-  sta .factor_count, y
+   dey
+   bne -
+   lda #$01
+   sta .factor_count
+   
+   jmp .factor_loop            ; try to divide by this new prime
+  ; 
+  }
