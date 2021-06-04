@@ -287,7 +287,7 @@ donesieve:
 
 ; Is remainder == 0?
    ldy #2              ; mathprec - 1
--  lda (mathop1), y
+-  lda remainder3, y
    bne .testk          ; branch if .k is not a factor of .j
    dey
    bpl -
@@ -409,7 +409,7 @@ remainder3=*
 ;  quotient3:  contains the quotient of the division
 ;
 ; Side Effects:
-;  mathop1 is changed to point to remainder3
+;  n/a
 ;
 divide3:
 ; zero out the quotient and remainder
@@ -429,12 +429,6 @@ divide3:
    dey
    bpl .init2
 
-; change mathop1 to point to remainder
-   lda #<remainder3
-   sta mathop1
-   lda #>remainder3
-   sta mathop1 + 1
-
 ; For each bit of the operands (.j & .k loops together)
 ; for .j = mathprec; .j >= 1; j --
    lda #3                 ; mathprec
@@ -445,59 +439,63 @@ divide3:
    sta .k
 .fork:
 ; quotient *= 2
-   ldy #$00
+   ldy #$ff
    ldx #3                 ; mathprec
    clc
--  lda quotient3, y
+-  iny
+   lda quotient3, y
    rol
    sta quotient3, y
-   iny
    dex
    bne -
 
 ; Shift the remainder and dividend one bit left,
 ; with the high bit of the dividend being shifted
 ; into the low bit of the remainder.
-   ldy #$00
+   ldy #$ff
    ldx #6                 ; mathprec * 2
    clc
 .shiftremdiv:
+   iny
    lda .dividend, y
    rol
    sta .dividend, y
-   iny
    dex
    bne .shiftremdiv
 
-; Is remainder >= divisor?
-; mathop1 is pointing to remainder3
+; Is remainder3 >= divisor?
 ; mathop2 is pointing to divisor
-   jsr compare3
-   bmi .endif            ; branch if remainder3 < divisor
+   ldy #2            ; mathprec - 1
+-  lda remainder3, y
+   cmp (mathop2), y
+   bcc .endif        ; branch if remainder3 < divisor
+   bne +             ; branch if remainder3 > divisor
+   dey
+   bpl -
 
 ; remainder -= divisor
-   sec
-   ldy #$00
++  sec
+   ldy #$ff
    ldx #3                ; mathprec
 .sub:
+   iny
    lda remainder3, y
    sbc (mathop2), y
    sta remainder3, y
-   iny
    dex
    bne .sub
 
 ; quotient ++
-   ldy #$00
+   ldy #$ff
    ldx #3                ; mathprec
    sec                   ; adding 1 to quotient
 .add:
+   iny
    lda quotient3, y
    adc #$00
    sta quotient3, y
-   iny
    dex
-   bne .add
+   bcs .add
 
 .endif:
 
