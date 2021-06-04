@@ -59,6 +59,17 @@ math_isequal:
     rts
 
 !zone compare {
+!macro math_set_param_compare a, b {
+   lda #<a
+   sta mathop1
+   lda #>a
+   sta mathop1 + 1
+   lda #<b
+   sta mathop2
+   lda #>b
+   sta mathop2 + 1
+}
+
 ; Set flags N, Z & C as though a subtraction of a multi-byte integer
 ; had been done.  (i.e. op1 - op2).
 ; This is analogous to a CMP, but for multiple bytes.
@@ -883,5 +894,117 @@ math_divide:
    rts
 
 }  ; end of zone division
+
+!zone zn_n_choose_k {
+;
+; Calculates n Choose k
+; This is the number of ways one can choose k items from a set of n items.
+;
+; Inputs:
+;  X register specifies n
+;  Y register specifies k
+;
+; Outputs:
+;  nchoosek will contain the result
+;
+; Side Effects:
+;  mathop1, mathop2, and mathres are all altered.
+;
+
+; Note .n, .k, .j, and .t will always fit within an unsigned byte
+; We use the large integers in order to pass them to other math routines.
+
+.n=*
+!fill mathprec, $00
+
+.k=*
+!fill mathprec, $00
+
+; loop counter
+.j=*
+!fill mathprec, $00
+
+; Will be set to "n - j + 1"
+.t=*
+!fill mathprec, $00
+
+nchoosek=*
+!fill mathprec, $00
+
+math_n_choose_k:
+   ; .k = Y
+   sty .k
+
+   ; if .k == 0, return 1
+   cpy #$00
+   bne +
+   ldy #mathprec - 1
+   lda #$00
+-  sta nchoosek, y
+   dey
+   bpl -
+   inc nchoosek
+   rts
+
+   ; .n = X
++  stx .n
+
+   ; nchoosek = .n
+   stx nchoosek
+
+   ; zero out locals & result
+   lda #$00
+   ldy #mathprec - 1
+-  sta .n, y
+   sta .k, y
+   sta .j, y
+   sta .t, y
+   sta nchoosek, y
+   dey
+   bne -
+
+   ; .t = n - j + 1
+   ; .t = n - 2 + 1
+   ; .t = n - 1
+   dex
+   stx .t
+
+   ; for .j = 2; .j <= k; .j ++
+   lda #$02
+   sta .j
+.forj:
+   ; test .j <= k
+   lda .k
+   cmp .j
+   bcc .done       ; branch if j > k
+   
+   ; nchoosek *= .t
+   +math_set_param_multiply nchoosek, .t, nchoosek
+   jsr math_multiply
+
+   ; nchoosek /= j
+   ; mathop1 is already pointing to nchoosek
+   lda #<.j
+   sta mathop2
+   lda #>.j
+   sta mathop2 + 1
+   jsr math_divide
+
+   ldy #mathprec - 1   ; copy quotient to nchoosek
+-  lda quotient, y
+   sta nchoosek, y
+   dey
+   bpl -
+
+.nextj:
+   ; j ++
+   inc .j
+   ; .t --
+   dec .t
+   jmp .forj
+
+.done:
+   rts
+}  ; end of zone zn_nchoose_k
 }
 
