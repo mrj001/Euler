@@ -1,0 +1,151 @@
+;@com.wudsn.ide.asm.hardware=C64
+!to "euler016.prg", cbm 
+!cpu 6510
+!sl "Euler016.labels"
+
+; BASIC program: (Where run is replaced by its address.)
+;   10 SYS run
+* = $0801
+    !byte <.basend,>.basend,$0A,$00  ; line 10
+    !byte $54, $49, $24, $b2, $22    ; TI$="000000":
+    !fill $06, $30
+    !byte $22, $3a
+    !byte $9e                        ; Sys keyword
+    !byte (run/1000) % 10 + '0'      ; Address for SYS
+    !byte (run/100) % 10 + '0'
+    !byte (run/10) % 10 + '0'
+    !byte run % 10 + '0'
+    !byte $3a, $99, $20, $54, $49    ; :PRINT TI
+    !byte 0
+.basend !byte 0, 0
+
+mathprec=$7e       ; 126 byte integers
+mathbcdprec=$08    ; This will not be helpful as we expect a
+                   ; 301 (or 302) digit number
+
+!src "preamble.a"
+!src "screen.a"
+!src "arithmetic.a"
+
+; This macro prints a string
+!macro print_string .str {
+    lda #<.str
+    sta+1 straddr
+    lda #>.str
+    sta+1 straddr + 1
+    jsr subprint
+}
+  
+.answer !scr "the answer is ", 0
+
+; two to the power of 1000
+; 1000 / 8 = 125
+; 1000 % 8 = 0
+.two_one_thousand=*
+!fill mathprec - 1, $00
+!byte $01
+
+.residual=*
+!fill mathprec, $00
+
+; sum of digits
+.sum=*
+!fill mathprec, $00
+
+run:
+   jsr subclearscreen
+
+   ; .residual = .two_one_thousand
+   ldy #mathprec - 1
+-  lda .two_one_thousand, y
+   sta .residual ,y
+   dey
+   bne -
+   lda .two_one_thousand
+   sta .residual
+
+   ;
+   ; .sum = 0
+   ;
+   ldy #$04
+   lda #$00
+-  sta .sum, y
+   dey
+   bpl -
+
+   ; 
+   ; Point mathop1 to .residual
+   ;
+   lda #<.residual
+   sta mathop1
+   lda #>.residual
+   sta mathop1 + 1
+
+   ;
+   ; Point mathop2 to "ten"
+   ;
+   lda #<ten
+   sta mathop2
+   lda #>ten
+   sta mathop2 + 1
+
+   ;
+   ; While residual != 0
+   ;
+.while_loop:
+   ldy #mathprec - 1
+-  lda .residual, y
+   bne .while_body
+   dey
+   bne -
+   lda .residual
+   bne .while_body
+   jmp .done
+
+.while_body:
+   ;
+   ; divide .residual by ten
+   ;
+   jsr math_divide
+
+   ;
+   ; .sum += remainder
+   ; The remainder must be in the range [0, 9] so we only
+   ; need to add one byte, plus any carries
+   ;
+   clc
+   lda .sum          ; add least significant byte
+   adc remainder
+   sta .sum
+   ldx #mathprec - 1 ; handle carry through more significant bytes
+   ldy #$01
+-  lda .sum, y
+   adc #$00
+   sta .sum, y
+   bcc +
+   iny
+   dex
+   bne -
++
+
+   ;
+   ; .residual = quotient
+   ;
+   ldy #mathprec - 1
+-  lda quotient, y
+   sta .residual, y
+   dey
+   bne -
+   lda quotient
+   sta .residual
+
+   jmp .while_loop
+
+.done:
+   +print_string .answer
+   +math_set_param_output_integer .sum
+   jsr math_output_integer
+   jsr screen_new_line
+   jsr screen_set_basic_cursor
+   rts
+
