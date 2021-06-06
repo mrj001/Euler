@@ -358,6 +358,13 @@ math_output_integer:
 ;    mathop1:  pointer to the number to sum
 ;    mathres:  pointer to the memory to receive the result.
 ;              This must be mathprec bytes.
+;
+; Outputs:
+;  mathres: points to the sum of the digits
+;
+; Side Effects:
+;  n/a
+;
 .intermediate=*
 !fill mathbcdprec, 0
 
@@ -372,7 +379,8 @@ math_digit_sum:
 .initLoop1:
    sta (mathres), y
    dey
-   bpl .initLoop1
+   bne .initLoop1
+   sta (mathres), y
    
 ; Save original value of mathres
    lda mathres
@@ -388,10 +396,12 @@ math_digit_sum:
 
 ; Zero out the space for the BCD number
    ldy #mathbcdprec - 1
+   lda #$00
 .initLoop2:
    sta .intermediate, y
    dey
-   bpl .initLoop2
+   bne .initLoop2
+   sta .intermediate
 
 ; convert input at mathop1 to BCD in .intermediate
    jsr math_bcd
@@ -452,7 +462,8 @@ math_digit_sum:
 ; next byte
 .next
    dex
-   bpl .addhi
+   cpx #$ff
+   bne .addhi
 
    rts
 
