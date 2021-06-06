@@ -20,8 +20,7 @@
 .basend !byte 0, 0
 
 mathprec=$7e       ; 126 byte integers
-mathbcdprec=$08    ; This will not be helpful as we expect a
-                   ; 301 (or 302) digit number
+mathbcdprec=$97    ; up to 302 digits
 
 !src "preamble.a"
 !src "screen.a"
@@ -55,91 +54,8 @@ mathbcdprec=$08    ; This will not be helpful as we expect a
 run:
    jsr subclearscreen
 
-   ; .residual = .two_one_thousand
-   ldy #mathprec - 1
--  lda .two_one_thousand, y
-   sta .residual ,y
-   dey
-   bne -
-   lda .two_one_thousand
-   sta .residual
-
-   ;
-   ; .sum = 0
-   ;
-   ldy #$04
-   lda #$00
--  sta .sum, y
-   dey
-   bpl -
-
-   ; 
-   ; Point mathop1 to .residual
-   ;
-   lda #<.residual
-   sta mathop1
-   lda #>.residual
-   sta mathop1 + 1
-
-   ;
-   ; Point mathop2 to "ten"
-   ;
-   lda #<ten
-   sta mathop2
-   lda #>ten
-   sta mathop2 + 1
-
-   ;
-   ; While residual != 0
-   ;
-.while_loop:
-   ldy #mathprec - 1
--  lda .residual, y
-   bne .while_body
-   dey
-   bne -
-   lda .residual
-   bne .while_body
-   jmp .done
-
-.while_body:
-   ;
-   ; divide .residual by ten
-   ;
-   jsr math_divide
-
-   ;
-   ; .sum += remainder
-   ; The remainder must be in the range [0, 9] so we only
-   ; need to add one byte, plus any carries
-   ;
-   clc
-   lda .sum          ; add least significant byte
-   adc remainder
-   sta .sum
-   ldx #mathprec - 1 ; handle carry through more significant bytes
-   ldy #$01
--  lda .sum, y
-   adc #$00
-   sta .sum, y
-   bcc +
-   iny
-   dex
-   bne -
-+
-
-   ;
-   ; .residual = quotient
-   ;
-   ldy #mathprec - 1
--  lda quotient, y
-   sta .residual, y
-   dey
-   bne -
-   lda quotient
-   sta .residual
-
-   jmp .while_loop
+   +math_set_param_digit_sum .two_one_thousand, .sum
+   jsr math_digit_sum
 
 .done:
    +print_string .answer
