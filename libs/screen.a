@@ -279,7 +279,8 @@ sub_outputBCD:
 
 .donebyte
    dey                  ; next byte
-   bpl .dohi
+   cpy #$ff
+   bne .dohi
 
    lda .zero_suppress   ; Check if we are still suppressing zeroes
    bne .return          ; branch if the number was not zero

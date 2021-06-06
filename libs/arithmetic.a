@@ -250,7 +250,8 @@ math_bcd:
 .zero_loop
    sta (mathres), y
    dey
-   bpl .zero_loop
+   bne .zero_loop
+   sta (mathres), y
 
    ldy #mathprec    ; number of bytes to convert
    ldx #$08         ; number of bits in a byte
