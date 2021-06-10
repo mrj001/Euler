@@ -1,0 +1,272 @@
+;@com.wudsn.ide.asm.hardware=C64
+!to "euler017.prg", cbm 
+!cpu 6510
+!sl "Euler017.labels"
+
+; BASIC program: (Where run is replaced by its address.)
+;   10 SYS run
+* = $0801
+    !byte <.basend,>.basend,$0A,$00  ; line 10
+    !byte $54, $49, $24, $b2, $22    ; TI$="000000":
+    !fill $06, $30
+    !byte $22, $3a
+    !byte $9e                        ; Sys keyword
+    !byte (run/1000) % 10 + '0'      ; Address for SYS
+    !byte (run/100) % 10 + '0'
+    !byte (run/10) % 10 + '0'
+    !byte run % 10 + '0'
+    !byte $3a, $99, $20, $54, $49    ; :PRINT TI
+    !byte 0
+.basend !byte 0, 0
+
+mathprec=$02
+mathbcdprec=$03
+
+!src "preamble.a"
+!src "screen.a"
+!src "arithmetic.a"
+
+; This macro prints a string
+!macro print_string .str {
+    lda #<.str
+    sta+1 straddr
+    lda #>.str
+    sta+1 straddr + 1
+    jsr subprint
+}
+  
+.answer !scr "the answer is ", 0
+
+.ones=*
+!byte 0      ; zero - not written
+!byte 3      ; one
+!byte 3      ; two
+!byte 5      ; three
+!byte 4      ; Four
+!byte 4      ; Five
+!byte 3      ; Six
+!byte 5      ; Seven
+!byte 5      ; Eight
+!byte 4      ; Nine
+; two-digit numbers from ten to nineteen are a special case
+.teens=*
+!byte 3     ; ten
+!byte 6     ; eleven
+!byte 6     ; twelve
+!byte 8     ; thirteen
+!byte 8     ; fourteen
+!byte 7     ; fifteen
+!byte 7     ; sixteen
+!byte 9     ; seventeen
+!byte 8     ; eighteen
+!byte 8     ; nineteen
+
+.tens=*
+!byte 0     ; zero tens is not used
+!byte 3     ; ten
+!byte 6     ; twenty
+!byte 6     ; thirty
+!byte 5     ; forty
+!byte 5     ; fifty
+!byte 5     ; sixty
+!byte 7     ; seventy
+!byte 6     ; eighty
+!byte 6     ; ninety
+
+.hundreds=*
+!byte 0     ; zero hundreds - not written
+!byte 10    ; "one hundred"
+!byte 10    ; "two hundred"
+!byte 12    ; "three hundred"
+!byte 11    ; "four hundred"
+!byte 11    ; "five hundred"
+!byte 10    ; "six hundred"
+!byte 12    ; "seven hundred"
+!byte 12    ; "eight hundred"
+!byte 11    ; "nine hundred"
+
+.thousands=*
+!byte 0     ; zero thousands - not written
+!byte 11    ; "one thousand"
+
+.sum=*
+!byte $00, $00
+
+; loop counter
+.j=*
+!byte $00, $00
+
+run:
+   jsr subclearscreen
+
+; .sum = 0
+   lda #$00
+   sta .sum
+   sta .sum + 1
+
+;
+; Add values from one to nineteen
+;
+; for y = 19; y > 0; y --
+   ldy #$13    ; y = 19
+.for_y:
+   clc
+   lda .ones, y
+   adc .sum
+   sta .sum
+   lda #$00
+   adc .sum + 1
+   sta .sum + 1
+
+; next y
+   dey
+   bne .for_y
+
+;
+; For .j = 20; .j <= 1_000; .j++
+;
+   lda #$20       ; .j = 20 (BCD)
+   sta .j
+   lda #$00
+   sta .j + 1
+.for_j:
+
+   jsr add_letters
+
+; .j ++
+   sei
+   sed
+   clc
+   lda .j
+   adc #$01
+   sta .j
+   lda .j + 1
+   adc #$00
+   sta .j + 1
+   cld
+   cli
+
+; Is .j <= 1_000
+   lda .j + 1
+   cmp #$10
+   bmi .for_j
+   lda .j
+   beq .for_j
+;   lda .j + 1   ; debugging
+;   cmp #$01     ; debugging
+;   bmi .for_j   ; debugging
+;   lda .j       ; debugging
+;   cmp #$21     ; debugging
+;   bmi .for_j   ; debugging
+
+; We don't have to compare the least significant byte at all
+; since it will be zero the first time the most significant
+; byte is $10
+
+.done:
+   +print_string .answer
+   +math_set_param_output_integer .sum
+   jsr math_output_integer
+   jsr screen_new_line
+   jsr screen_set_basic_cursor
+   rts
+
+;
+; This subroutine adds up the letters needed for the number j.
+;
+add_letters:
+;
+;  Add letter count for the thousands digit
+;
+   lda .j + 1
+   lsr
+   lsr
+   lsr
+   lsr
+   beq .hundreds_digit
+
+   tay                ; translate the digit to the letter count
+   lda .thousands, y
+
+   jsr add_letter_count
+
+.hundreds_digit:
+   lda .j + 1
+   and #$0f
+   beq .tens_digit
+
+   tay               ; translate the digit to the letter count
+   lda .hundreds, y
+
+   jsr add_letter_count
+
+; Do we have to add an "and"
+   lda .j
+   beq .no_and        ; branch if ones and tens digits are both zero
+
+   clc                ; add 3 for "and"
+   lda #$03
+   adc .sum
+   sta .sum
+   lda #$00
+   adc .sum + 1
+   sta .sum + 1
+
+.no_and:
+; Is the low byte of .j < 20?
+   lda .j
+   cmp #$20
+   bpl .tens_digit      ; branch if .j >= 20
+; Is the low byte of .j < 10?
+   and #$f0
+   beq .ones_digit      ; branch if the tens digit is zero
+
+   lda .j               ; tens digit must be one; isolate ones digit
+   and #$0f
+
+   tay                ; translate the digit to the letter count
+   lda .teens, y
+
+   jsr add_letter_count
+
+   rts
+
+.tens_digit:
+   lda .j
+   lsr
+   lsr
+   lsr
+   lsr
+   beq .ones_digit
+
+   tay                ; translate the digit to the letter count
+   lda .tens, y
+
+   jsr add_letter_count
+
+.ones_digit:
+   lda .j
+   and #$0f
+   beq .return
+
+   tay                ; translate the digit to the letter count
+   lda .ones, y
+
+   jsr add_letter_count
+
+.return:
+   rts
+
+;
+; Adds the letter count in Accumulator to .sum
+;
+add_letter_count:
+   clc
+   adc .sum
+   sta .sum
+   lda #$00
+   adc .sum + 1
+   sta .sum + 1
+
+   rts
+
